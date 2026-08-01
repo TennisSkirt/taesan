@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { guessRegion } from './lib/format'
 import type {
   Account,
   CashTx,
@@ -37,5 +38,19 @@ db.version(1).stores({
 db.version(2).stores({
   cashTxs: '++id, accountId, fromAccountId, date, type',
 })
+
+// v3: 계좌에 관리 국가(region) 추가 — 기존 계좌는 이름으로 추정해 배정
+db.version(3)
+  .stores({
+    accounts: '++id, name, kind, region',
+  })
+  .upgrade((tx) =>
+    tx
+      .table('accounts')
+      .toCollection()
+      .modify((a: { name: string; region?: string }) => {
+        if (!a.region) a.region = guessRegion(a.name)
+      })
+  )
 
 export { db }

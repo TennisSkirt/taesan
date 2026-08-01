@@ -5,8 +5,8 @@ import { useTheme } from '../theme'
 import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
 import { DEFAULT_MAIN_CURRENCY } from '../lib/usePortfolio'
-import { CURRENCY_LABEL, CURRENCY_SYMBOL, todayStr } from '../lib/format'
-import type { Currency } from '../types'
+import { CURRENCY_LABEL, CURRENCY_SYMBOL, guessRegion, REGION_FLAG, REGIONS, todayStr } from '../lib/format'
+import type { Currency, Region } from '../types'
 import Icon from '../components/Icon'
 
 const CURRENCIES: Currency[] = ['JPY', 'KRW', 'USD']
@@ -193,23 +193,38 @@ export default function Settings() {
           <Icon name={showAccounts ? 'expand_less' : 'chevron_right'} size={20} color="var(--text-3)" />
         </div>
         {showAccounts &&
-          accounts.map((a) => (
-            <div className="list-item" key={a.id} style={{ background: 'var(--surface-2)' }}>
-              <div className="item-main" style={{ paddingLeft: 46 }}>
-                <div className="item-name" style={{ fontSize: 14, fontWeight: 600 }}>{a.name}</div>
+          accounts.map((a) => {
+            const region: Region = a.region ?? guessRegion(a.name)
+            return (
+              <div className="list-item" key={a.id} style={{ background: 'var(--surface-2)' }}>
+                <div className="item-main" style={{ paddingLeft: 46 }}>
+                  <div className="item-name" style={{ fontSize: 14, fontWeight: 600 }}>{a.name}</div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    {REGIONS.map((r) => (
+                      <button
+                        key={r}
+                        className={`chip-btn ${region === r ? 'on' : ''}`}
+                        style={{ fontSize: 11, padding: '3px 9px' }}
+                        onClick={() => db.accounts.update(a.id!, { region: r })}
+                      >
+                        {REGION_FLAG[r]}
+                      </button>
+                    ))}
+                    <button
+                      className={`chip-btn ${a.nisa ? 'on' : ''}`}
+                      style={{ fontSize: 11, padding: '3px 9px' }}
+                      onClick={() => db.accounts.update(a.id!, { nisa: !a.nisa })}
+                    >
+                      NISA
+                    </button>
+                  </div>
+                </div>
+                <button className="btn-ghost" style={{ color: 'var(--up)' }} onClick={() => deleteAccount(a.id!, a.name)}>
+                  삭제
+                </button>
               </div>
-              <button
-                className={`chip-btn ${a.nisa ? 'on' : ''}`}
-                style={{ fontSize: 11, padding: '4px 10px' }}
-                onClick={() => db.accounts.update(a.id!, { nisa: !a.nisa })}
-              >
-                NISA
-              </button>
-              <button className="btn-ghost" style={{ color: 'var(--up)' }} onClick={() => deleteAccount(a.id!, a.name)}>
-                삭제
-              </button>
-            </div>
-          ))}
+            )
+          })}
 
         {/* 환율 */}
         <div className="list-item" style={{ cursor: 'pointer' }} onClick={() => setShowFx(!showFx)}>

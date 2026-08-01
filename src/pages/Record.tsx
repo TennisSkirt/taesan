@@ -1,23 +1,40 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import type { AssetClass, Currency, Market } from '../types'
-import { MARKET_CURRENCY, MARKET_LABEL, CURRENCY_SYMBOL, fmtMoney, todayStr } from '../lib/format'
+import type { AssetClass, Currency, Market, Region } from '../types'
+import {
+  MARKET_CURRENCY,
+  MARKET_LABEL,
+  CURRENCY_SYMBOL,
+  REGION_FLAG,
+  REGION_LABEL,
+  REGIONS,
+  fmtMoney,
+  guessRegion,
+  todayStr,
+} from '../lib/format'
 import Icon from '../components/Icon'
 
 type Tab = 'buy' | 'sell' | 'dividend' | 'cash'
 type CashDir = 'in' | 'out'
 
-const ACCOUNT_SUGGESTIONS = ['토스증권', 'NH투자증권', 'E*TRADE', '라쿠텐증권', '라쿠텐 NISA']
+const REGION_SUGGESTIONS: Record<Region, string[]> = {
+  JP: ['라쿠텐증권', '라쿠텐 신NISA', 'SBI증권'],
+  KR: ['토스증권', 'NH투자증권', '카카오뱅크 저금'],
+  US: ['E*TRADE'],
+}
+/** 국가별 기본 종목 시장 */
+const REGION_MARKET: Record<Region, Market> = { JP: 'JP', KR: 'KR', US: 'US' }
 const IN_SOURCES = ['월급', '용돈', '이자', '기존 자산', '기타']
 const OUT_SOURCES = ['생활비', '경조사', '인출', '기타']
 
 export default function Record() {
-  const accounts = useLiveQuery(() => db.accounts.toArray(), [], [])
+  const allAccounts = useLiveQuery(() => db.accounts.toArray(), [], [])
   const [tab, setTab] = useState<Tab>('buy')
+  const [region, setRegion] = useState<Region>('JP')
   const [accountId, setAccountId] = useState<number | ''>('')
   const [newAccount, setNewAccount] = useState('')
-  const [market, setMarket] = useState<Market>('KR')
+  const [market, setMarket] = useState<Market>('JP')
   const [assetClass, setAssetClass] = useState<AssetClass>('stock')
   const [symbol, setSymbol] = useState('')
   const [name, setName] = useState('')
@@ -37,6 +54,17 @@ export default function Record() {
 
   const currency = tab === 'cash' ? cashCurrency : MARKET_CURRENCY[market]
   const sym = CURRENCY_SYMBOL[currency]
+  const regionOf = (a: { name: string; region?: Region }) => a.region ?? guessRegion(a.name)
+  const accounts = allAccounts.filter((a) => regionOf(a) === region)
+
+  function switchRegion(r: Region) {
+    setRegion(r)
+    setMarket(REGION_MARKET[r])
+    setCashCurrency(MARKET_CURRENCY[REGION_MARKET[r]])
+    const cur = allAccounts.find((a) => a.id === accountId)
+    if (!cur || regionOf(cur) !== r) setAccountId('')
+    setParty('')
+  }
 
   const recent = useLiveQuery(
     async () => {
@@ -84,6 +112,7 @@ export default function Record() {
     const id = await db.accounts.add({
       name: nm,
       kind: 'brokerage',
+      region,
       // 이름에 NISA/니사가 들어가면 자동으로 비과세 계좌 표시 (설정에서 변경 가능)
       nisa: /nisa|니사/i.test(nm) || undefined,
       createdAt: todayStr(),
@@ -183,6 +212,15 @@ export default function Record() {
     <main className="page">
       <div className="page-title">기록</div>
 
+      {/* 관리 국가 */}
+      <div className="seg">
+        {REGIONS.map((r) => (
+          <button key={r} className={region === r ? 'on' : ''} onClick={() => switchRegion(r)}>
+            {REGION_FLAG[r]} {REGION_LABEL[r]}
+          </button>
+        ))}
+      </div>
+
       <div className="seg">
         {(['buy', 'sell', 'dividend', 'cash'] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
@@ -224,7 +262,11 @@ export default function Record() {
         <div className="input">
           <Icon name="add" size={19} color="var(--text-3)" />
           <input
-            placeholder={accounts.length === 0 ? '계좌 이름 입력 (예: 토스증권)' : '새 계좌 추가'}
+            placeholder={
+              accounts.length === 0
+                ? `${REGION_LABEL[region]} 계좌 이름 입력 (예: ${REGION_SUGGESTIONS[region][0]})`
+                : `새 ${REGION_LABEL[region]} 계좌 추가`
+            }
             value={newAccount}
             onChange={(e) => setNewAccount(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addAccount()}
@@ -237,7 +279,7 @@ export default function Record() {
         </div>
         {accounts.length === 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-            {ACCOUNT_SUGGESTIONS.map((s) => (
+            {REGION_SUGGESTIONS[region].map((s) => (
               <button key={s} className="chip-btn" onClick={() => setNewAccount(s)}>
                 {s}
               </button>
@@ -358,7 +400,16 @@ export default function Record() {
                 <button className={assetClass === 'etf' ? 'on' : ''} onClick={() => setAssetClass('etf')}>
                   ETF
                 </button>
+                <button className={assetClass === 'fund' ? 'on' : ''} onClick={() => setAssetClass('fund')}>
+                  투자신탁
+                </button>
               </div>
+              {assetClass === 'fund' && (
+                <p className="hint" style={{ marginTop: 8 }}>
+                  투자신탁은 수량을 구수(口数), 단가를 기준가액으로 입력하세요. 기준가액이 1만구
+                  기준이면 수량도 만구 단위로 맞춰 입력하면 평가액이 맞아요.
+                </p>
+              )}
             </div>
           )}
         </>
@@ -386,7 +437,7 @@ export default function Record() {
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
                 />
-                <span className="unit">주</span>
+                <span className="unit">{assetClass === 'fund' ? '구' : '주'}</span>
               </div>
             </div>
             <div>

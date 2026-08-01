@@ -1,4 +1,4 @@
-import type { Currency, Market } from '../types'
+import type { AssetClass, Currency, Market, Region } from '../types'
 
 export const CURRENCY_SYMBOL: Record<Currency, string> = { KRW: '₩', USD: '$', JPY: '¥' }
 
@@ -7,6 +7,28 @@ export const CURRENCY_LABEL: Record<Currency, string> = { KRW: '원화', USD: '�
 export const MARKET_CURRENCY: Record<Market, Currency> = { KR: 'KRW', US: 'USD', JP: 'JPY' }
 
 export const MARKET_LABEL: Record<Market, string> = { KR: '한국', US: '미국', JP: '일본' }
+
+export const REGION_LABEL: Record<Region, string> = { JP: '일본', KR: '한국', US: '미국' }
+
+export const REGION_FLAG: Record<Region, string> = { JP: '🇯🇵', KR: '🇰🇷', US: '🇺🇸' }
+
+/** 국가별 기준 통화 — 그 나라 화면은 이 통화로 표시 */
+export const REGION_CURRENCY: Record<Region, Currency> = { JP: 'JPY', KR: 'KRW', US: 'USD' }
+
+export const REGIONS: Region[] = ['JP', 'KR', 'US']
+
+export const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
+  stock: '주식',
+  etf: 'ETF',
+  fund: '투자신탁',
+}
+
+/** 계좌 이름으로 관리 국가 추정 (기존 데이터 마이그레이션·기본값용) */
+export function guessRegion(name: string): Region {
+  if (/라쿠텐|rakuten|sbi|nisa|니사|노무라|다이와|마넥스|monex/i.test(name)) return 'JP'
+  if (/e\s?\*?\s?trade|이트레이드|schwab|슈왑|fidelity|피델리티|robinhood/i.test(name)) return 'US'
+  return 'KR'
+}
 
 export function fmtMoney(v: number, c: Currency): string {
   const digits = c === 'USD' ? 2 : 0

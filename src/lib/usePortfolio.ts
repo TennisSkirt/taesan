@@ -1,7 +1,20 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { computeCash, computeHoldings, currentPrice, fromKRW, toKRW, type Holding } from './portfolio'
-import type { Currency } from '../types'
+import { guessRegion, REGIONS } from './format'
+import type { Currency, Region } from '../types'
+
+export interface RegionSummary {
+  region: Region
+  stockKRW: number
+  cashKRW: number
+  totalKRW: number
+  investedKRW: number
+  gainKRW: number // 미실현 (주식)
+  gainPct: number
+  holdingCount: number
+  hasData: boolean
+}
 
 /** 메인(표시) 통화 — 기본값 엔화 */
 export const DEFAULT_MAIN_CURRENCY: Currency = 'JPY'
@@ -78,10 +91,43 @@ export function usePortfolio() {
 
   // 내부 계산은 KRW 기준, 표시할 때 메인 통화로 환산
   const toMain = (amountKRW: number) => fromKRW(amountKRW, main, fx)
+  const toCurrency = (amountKRW: number, currency: Currency) => fromKRW(amountKRW, currency, fx)
+
+  // 계좌 → 관리 국가
+  const regionOf = (accountId: number): Region => {
+    const a = accounts.find((x) => x.id === accountId)
+    return a?.region ?? (a ? guessRegion(a.name) : 'KR')
+  }
+
+  // 국가별 요약
+  const byRegion: Record<Region, RegionSummary> = Object.fromEntries(
+    REGIONS.map((r) => [
+      r,
+      { region: r, stockKRW: 0, cashKRW: 0, totalKRW: 0, investedKRW: 0, gainKRW: 0, gainPct: 0, holdingCount: 0, hasData: false },
+    ])
+  ) as Record<Region, RegionSummary>
+  for (const h of holdings) {
+    const s = byRegion[regionOf(h.accountId)]
+    s.stockKRW += h.valueKRW
+    s.investedKRW += toKRW(h.invested, h.currency, fx)
+    s.gainKRW += toKRW(h.gain, h.currency, fx)
+    s.holdingCount += 1
+  }
+  for (const b of cashBalances) {
+    byRegion[regionOf(b.accountId)].cashKRW += b.amountKRW
+  }
+  for (const s of Object.values(byRegion)) {
+    s.totalKRW = s.stockKRW + s.cashKRW
+    s.gainPct = s.investedKRW > 0 ? (s.gainKRW / s.investedKRW) * 100 : 0
+    s.hasData = s.holdingCount > 0 || Math.abs(s.cashKRW) > 1e-9
+  }
 
   return {
     main,
     toMain,
+    toCurrency,
+    regionOf,
+    byRegion,
     accounts,
     transactions,
     dividends,

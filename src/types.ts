@@ -1,13 +1,19 @@
 export type Currency = 'KRW' | 'USD' | 'JPY'
 export type Market = 'KR' | 'US' | 'JP'
 
-export type AssetClass = 'stock' | 'etf'
+/** 관리 국가 — 계좌가 소속된 나라. 종목의 시장(Market)과는 별개
+ *  (예: 일본 계좌에서 미국 ETF 보유 → region JP, market US) */
+export type Region = 'JP' | 'KR' | 'US'
+
+export type AssetClass = 'stock' | 'etf' | 'fund' // fund = 투자신탁
 
 /** 증권사·은행 등 계좌. 주식 계좌뿐 아니라 예금/현금성 계좌도 포함 */
 export interface Account {
   id?: number
   name: string // 예: 토스증권, NH투자증권, 라쿠텐증권, E*TRADE
   kind: 'brokerage' | 'bank' | 'cash' | 'other'
+  /** 계좌가 소속된 관리 국가 */
+  region?: Region
   /** 일본 NISA(비과세) 계좌 여부 — 세금 계산에서 비과세 처리 */
   nisa?: boolean
   createdAt: string

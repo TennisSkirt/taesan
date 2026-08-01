@@ -1,8 +1,19 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { usePortfolio } from '../lib/usePortfolio'
-import { CURRENCY_LABEL, fmtMoney, fmtPct, fmtSignedMoney, todayStr } from '../lib/format'
+import {
+  CURRENCY_LABEL,
+  fmtMoney,
+  fmtPct,
+  fmtSignedMoney,
+  REGION_CURRENCY,
+  REGION_FLAG,
+  REGION_LABEL,
+  REGIONS,
+  todayStr,
+} from '../lib/format'
 import Icon from '../components/Icon'
 
 function greeting(): string {
@@ -14,6 +25,16 @@ function greeting(): string {
 export default function Dashboard() {
   const p = usePortfolio()
   const accountName = (id: number) => p.accounts.find((a) => a.id === id)?.name ?? ''
+  const snapshots = useLiveQuery(() => db.snapshots.orderBy('date').toArray(), [], [])
+
+  const trend = snapshots.slice(-30)
+  const maxV = Math.max(...trend.map((s) => s.totalKRW), 1)
+  const minV = Math.min(...trend.map((s) => s.totalKRW), maxV)
+  const points = trend.map((s, i) => {
+    const x = trend.length > 1 ? (i / (trend.length - 1)) * 300 : 150
+    const y = maxV > minV ? 110 - ((s.totalKRW - minV) / (maxV - minV)) * 96 : 60
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
 
   // 데이터가 있으면 오늘 자산 스냅샷 기록 (자산 추이 그래프용)
   useEffect(() => {
@@ -81,11 +102,74 @@ export default function Dashboard() {
       </div>
 
       <div className="section-head">
+        <div className="t">국가별 자산</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {REGIONS.map((r) => {
+          const s = p.byRegion[r]
+          const cur = REGION_CURRENCY[r]
+          return (
+            <Link key={r} to={`/portfolio?r=${r}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <div className="card-sm" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '15px 16px' }}>
+                <div className="item-icon" style={{ fontSize: 20, background: 'var(--surface-3)' }}>
+                  {REGION_FLAG[r]}
+                </div>
+                <div className="item-main">
+                  <div className="item-name" style={{ fontSize: 14 }}>{REGION_LABEL[r]}</div>
+                  <div className="item-sub">
+                    {s.hasData
+                      ? `${s.holdingCount}종목${p.main !== cur ? ' · ' + fmtMoney(p.toMain(s.totalKRW), p.main) : ''}`
+                      : '기록 없음'}
+                  </div>
+                </div>
+                <div className="item-right">
+                  <div className="item-value">{fmtMoney(p.toCurrency(s.totalKRW, cur), cur)}</div>
+                  {s.holdingCount > 0 && (
+                    <div className={`item-ret ${s.gainPct >= 0 ? 'up' : 'down'}`}>{fmtPct(s.gainPct)}</div>
+                  )}
+                </div>
+                <Icon name="chevron_right" size={18} color="var(--text-3)" />
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+
+      <div className="card">
+        <div className="card-title">자산 추이</div>
+        {trend.length >= 2 ? (
+          <>
+            <svg viewBox="0 0 300 120" style={{ width: '100%', height: 120, marginTop: 12, display: 'block', overflow: 'visible' }}>
+              <defs>
+                <linearGradient id="trend" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="var(--accent)" stopOpacity=".2" />
+                  <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={`M${points.join(' L')} L300,120 L0,120 Z`} fill="url(#trend)" />
+              <path
+                d={`M${points.join(' L')}`}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span className="hint" style={{ fontSize: 10 }}>{trend[0].date.slice(2)}</span>
+              <span className="hint" style={{ fontSize: 10 }}>{trend[trend.length - 1].date.slice(2)}</span>
+            </div>
+          </>
+        ) : (
+          <p className="hint" style={{ marginTop: 10, lineHeight: 1.5 }}>
+            앱을 열 때마다 그날의 자산이 기록됩니다. 이틀째부터 추이 그래프가 그려져요.
+          </p>
+        )}
+      </div>
+
+      <div className="section-head">
         <div className="t">보유 종목</div>
-        <Link to="/portfolio" className="btn-ghost" style={{ textDecoration: 'none' }}>
-          전체보기
-          <Icon name="chevron_right" size={16} />
-        </Link>
       </div>
 
       {p.holdings.length > 0 ? (
