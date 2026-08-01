@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useTheme } from '../theme'
+import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
 import { DEFAULT_MAIN_CURRENCY } from '../lib/usePortfolio'
 import { CURRENCY_LABEL, CURRENCY_SYMBOL, todayStr } from '../lib/format'
@@ -16,9 +17,15 @@ export default function Settings() {
   const fx = useLiveQuery(() => db.fxCache.toArray(), [], [])
   const mainSetting = useLiveQuery(() => db.settings.get('mainCurrency'), [], undefined)
   const main = (mainSetting?.value as Currency | undefined) ?? DEFAULT_MAIN_CURRENCY
+  const lockRow = useLiveQuery(() => db.settings.get('appLock'), [], undefined)
+  const lock = (lockRow?.value as LockData | undefined) ?? null
   const [showAccounts, setShowAccounts] = useState(false)
   const [showFx, setShowFx] = useState(false)
   const [showMain, setShowMain] = useState(false)
+  const [showLock, setShowLock] = useState(false)
+  const [curPw, setCurPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [newPw2, setNewPw2] = useState('')
   const [toast, setToast] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -28,6 +35,41 @@ export default function Settings() {
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 1800)
+  }
+
+  function clearPwInputs() {
+    setCurPw('')
+    setNewPw('')
+    setNewPw2('')
+  }
+
+  async function enableLock() {
+    if (newPw.length < 4) return showToast('비밀번호는 4자 이상으로 해주세요')
+    if (newPw !== newPw2) return showToast('비밀번호 확인이 일치하지 않아요')
+    await setLockPassword(newPw)
+    clearPwInputs()
+    setShowLock(false)
+    showToast('앱 잠금을 켰어요')
+  }
+
+  async function changeLock() {
+    if (!lock) return
+    if (!(await verifyPassword(curPw, lock))) return showToast('현재 비밀번호가 맞지 않아요')
+    if (newPw.length < 4) return showToast('새 비밀번호는 4자 이상으로 해주세요')
+    if (newPw !== newPw2) return showToast('비밀번호 확인이 일치하지 않아요')
+    await setLockPassword(newPw)
+    clearPwInputs()
+    setShowLock(false)
+    showToast('비밀번호를 바꿨어요')
+  }
+
+  async function disableLock() {
+    if (!lock) return
+    if (!(await verifyPassword(curPw, lock))) return showToast('현재 비밀번호가 맞지 않아요')
+    await removeLock()
+    clearPwInputs()
+    setShowLock(false)
+    showToast('앱 잠금을 껐어요')
   }
 
   async function setFx(key: 'USD' | 'JPY', value: string) {
@@ -197,6 +239,72 @@ export default function Settings() {
                   <input type="number" inputMode="decimal" step="0.01" defaultValue={jpy} onBlur={(e) => setFx('JPY', e.target.value)} />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 앱 잠금 */}
+        <div className="list-item" style={{ cursor: 'pointer' }} onClick={() => { setShowLock(!showLock); clearPwInputs() }}>
+          <div className="item-icon" style={{ width: 34, height: 34, borderRadius: 10 }}>
+            <Icon name="lock" size={19} />
+          </div>
+          <div className="item-main">
+            <div className="item-name" style={{ fontSize: 15, fontWeight: 600 }}>앱 잠금</div>
+            <div className="item-sub">{lock ? '켜짐 · 열 때 비밀번호 필요' : '꺼짐'}</div>
+          </div>
+          <Icon name={showLock ? 'expand_less' : 'chevron_right'} size={20} color="var(--text-3)" />
+        </div>
+        {showLock && (
+          <div className="list-item" style={{ background: 'var(--surface-2)' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {lock && (
+                <div className="input" style={{ padding: '10px 12px' }}>
+                  <input
+                    type="password"
+                    placeholder="현재 비밀번호"
+                    value={curPw}
+                    onChange={(e) => setCurPw(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="input" style={{ padding: '10px 12px' }}>
+                <input
+                  type="password"
+                  placeholder={lock ? '새 비밀번호 (4자 이상)' : '비밀번호 (4자 이상)'}
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                />
+              </div>
+              <div className="input" style={{ padding: '10px 12px' }}>
+                <input
+                  type="password"
+                  placeholder="비밀번호 확인"
+                  value={newPw2}
+                  onChange={(e) => setNewPw2(e.target.value)}
+                />
+              </div>
+              {lock ? (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-primary" style={{ flex: 1, padding: 12, fontSize: 14 }} onClick={changeLock}>
+                    비밀번호 변경
+                  </button>
+                  <button
+                    className="chip-btn"
+                    style={{ flex: 1, borderRadius: 16, color: 'var(--up)' }}
+                    onClick={disableLock}
+                  >
+                    잠금 끄기
+                  </button>
+                </div>
+              ) : (
+                <button className="btn-primary" style={{ padding: 12, fontSize: 14 }} onClick={enableLock}>
+                  잠금 켜기
+                </button>
+              )}
+              <p className="hint" style={{ lineHeight: 1.5 }}>
+                앱을 열거나 1분 이상 화면을 벗어나면 비밀번호를 요구합니다. 비밀번호를 잊으면 초기화
+                방법이 없으니 꼭 기억해주세요.
+              </p>
             </div>
           </div>
         )}

@@ -476,6 +476,57 @@ button {
   font-variation-settings: 'FILL' 1;
 }
 
+/* 잠금 화면 */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.lock-card {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.lock-art {
+  width: 132px;
+  height: 132px;
+  border-radius: 32px;
+  box-shadow: var(--shadow-2);
+  margin-bottom: 18px;
+}
+
+.lock-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  margin-bottom: 6px;
+  padding-left: 0.3em; /* letter-spacing 시각 보정 */
+}
+
+.lock-screen .btn-primary {
+  width: 100%;
+}
+
+.shake {
+  animation: shake 0.35s ease;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  50% { transform: translateX(7px); }
+  75% { transform: translateX(-4px); }
+}
+
 /* 저장 토스트 */
 .toast {
   position: fixed;
