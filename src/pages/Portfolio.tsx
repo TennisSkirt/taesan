@@ -183,7 +183,7 @@ export default function Portfolio() {
                           color: 'var(--accent)',
                         }}
                       >
-                        NISA
+                        {a.nisaType === 'ippan' || a.nisaType === 'tsumitate' ? '구NISA' : '신NISA'}
                       </span>
                     )}
                   </div>

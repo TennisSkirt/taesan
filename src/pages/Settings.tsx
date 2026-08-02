@@ -9,6 +9,7 @@ import {
   CURRENCY_LABEL,
   CURRENCY_SYMBOL,
   guessRegion,
+  NISA_TYPE_LABEL,
   REGION_FLAG,
   REGION_LABEL,
   REGION_SUGGESTIONS,
@@ -94,12 +95,14 @@ export default function Settings() {
   async function addAccount() {
     const nm = newAcctName.trim()
     if (!nm) return
+    const isNisa = /nisa|니사/i.test(nm)
     await db.accounts.add({
       name: nm,
       kind: 'brokerage',
       region: newAcctRegion,
-      // 이름에 NISA/니사가 들어가면 자동으로 비과세 계좌 표시
-      nisa: /nisa|니사/i.test(nm) || undefined,
+      // 이름에 NISA/니사가 들어가면 자동으로 비과세 계좌 표시. 구NISA면 일반(5년)으로 시작
+      nisa: isNisa || undefined,
+      nisaType: isNisa ? (/구|旧|old/i.test(nm) ? 'ippan' : 'shin') : undefined,
       createdAt: todayStr(),
     })
     setNewAcctName('')
@@ -261,7 +264,7 @@ export default function Settings() {
               <div className="list-item" key={a.id} style={{ background: 'var(--surface-2)' }}>
                 <div className="item-main" style={{ paddingLeft: 46 }}>
                   <div className="item-name" style={{ fontSize: 14, fontWeight: 600 }}>{a.name}</div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                     {REGIONS.map((r) => (
                       <button
                         key={r}
@@ -279,6 +282,17 @@ export default function Settings() {
                     >
                       NISA
                     </button>
+                    {a.nisa &&
+                      (['shin', 'ippan', 'tsumitate'] as const).map((t) => (
+                        <button
+                          key={t}
+                          className={`chip-btn ${(a.nisaType ?? 'shin') === t ? 'on' : ''}`}
+                          style={{ fontSize: 11, padding: '3px 9px' }}
+                          onClick={() => db.accounts.update(a.id!, { nisaType: t })}
+                        >
+                          {NISA_TYPE_LABEL[t]}
+                        </button>
+                      ))}
                   </div>
                 </div>
                 <button className="btn-ghost" style={{ color: 'var(--up)' }} onClick={() => deleteAccount(a.id!, a.name)}>

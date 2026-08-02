@@ -16,6 +16,9 @@ export interface Account {
   region?: Region
   /** 일본 NISA(비과세) 계좌 여부 — 세금 계산에서 비과세 처리 */
   nisa?: boolean
+  /** NISA 종류 — shin: 신NISA(무기한), ippan: 구NISA 일반(5년), tsumitate: 구NISA 적립(20년).
+   *  미지정이면 신NISA로 취급 */
+  nisaType?: 'shin' | 'ippan' | 'tsumitate'
   createdAt: string
 }
 

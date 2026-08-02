@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { usePortfolio } from '../lib/usePortfolio'
 import { convert, fxRate, toKRW } from '../lib/portfolio'
-import { CURRENCY_SYMBOL, fmtMoney } from '../lib/format'
+import { CURRENCY_SYMBOL, fmtMoney, NISA_TYPE_LABEL, oldNisaExpiryYear } from '../lib/format'
 import type { Currency } from '../types'
 import Icon from '../components/Icon'
 import TopBar from '../components/TopBar'
@@ -116,9 +116,82 @@ export default function Analysis() {
     }
   })
 
+  // 구NISA 비과세 만료 — 구NISA 계좌의 매수 기록을 (종목, 매수연도)별로 묶어 만료 연도 계산
+  const nowYear = new Date().getFullYear()
+  const oldNisaAccounts = p.accounts.filter(
+    (a) => a.nisa && (a.nisaType === 'ippan' || a.nisaType === 'tsumitate')
+  )
+  const lotMap = new Map<
+    string,
+    { name: string; accountName: string; nisaType: 'ippan' | 'tsumitate'; buyYear: number; expiry: number; qty: number }
+  >()
+  for (const t of p.transactions) {
+    if (t.type !== 'buy') continue
+    const acct = oldNisaAccounts.find((a) => a.id === t.accountId)
+    if (!acct) continue
+    // 이미 전량 매도한 종목은 제외
+    if (!p.holdings.some((h) => h.accountId === t.accountId && h.symbol === t.symbol && h.qty > 0)) continue
+    const buyYear = Number(t.date.slice(0, 4))
+    const nisaType = acct.nisaType as 'ippan' | 'tsumitate'
+    const key = `${t.accountId}:${t.symbol}:${buyYear}`
+    const lot = lotMap.get(key)
+    if (lot) lot.qty += t.quantity
+    else
+      lotMap.set(key, {
+        name: t.name,
+        accountName: acct.name,
+        nisaType,
+        buyYear,
+        expiry: oldNisaExpiryYear(buyYear, nisaType),
+        qty: t.quantity,
+      })
+  }
+  const nisaLots = [...lotMap.values()].sort((a, b) => a.expiry - b.expiry)
+
   return (
     <main className="page">
       <TopBar title="분석" />
+
+      {nisaLots.length > 0 && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="hourglass_bottom" size={19} color="var(--accent)" />
+            <div className="card-title">구NISA 비과세 만료</div>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {nisaLots.map((l, i) => {
+              const status =
+                l.expiry < nowYear
+                  ? { text: '만료됨 · 과세계좌 이관', color: 'var(--up)', bold: true }
+                  : l.expiry === nowYear
+                    ? { text: '올해 말 만료!', color: 'var(--up)', bold: true }
+                    : { text: `${l.expiry - nowYear}년 남음`, color: 'var(--text-3)', bold: false }
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {l.name}
+                    </div>
+                    <div className="hint">
+                      {l.accountName} · {NISA_TYPE_LABEL[l.nisaType]} · {l.buyYear}년 매수
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flex: 'none' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{l.expiry}년 말</div>
+                    <div style={{ fontSize: 12, fontWeight: status.bold ? 800 : 600, color: status.color }}>
+                      {status.text}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
+            만료되면 과세계좌로 자동 이관되고, 이관 시점의 시가가 새 취득가가 됩니다. 만료 전에
+            계속 보유할지 매도할지 정해두는 게 좋아요.
+          </p>
+        </div>
+      )}
 
       <FxCalculator key={p.main} main={p.main} fx={p.fx} />
 

@@ -25,9 +25,20 @@ export const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
 
 /** 국가별 계좌 이름 추천 (계좌 추가 UI용) */
 export const REGION_SUGGESTIONS: Record<Region, string[]> = {
-  JP: ['라쿠텐증권', '라쿠텐 신NISA', 'SBI증권'],
+  JP: ['라쿠텐증권', '라쿠텐 신NISA', '라쿠텐 구NISA', 'SBI증권'],
   KR: ['토스증권', 'NH투자증권', '카카오뱅크 저금'],
   US: ['E*TRADE'],
+}
+
+export const NISA_TYPE_LABEL = {
+  shin: '신NISA',
+  ippan: '구NISA·일반',
+  tsumitate: '구NISA·적립',
+} as const
+
+/** 구NISA 비과세 만료 연도 — 매수 연도 포함 일반 5년(+4), 적립 20년(+19)의 연말까지 */
+export function oldNisaExpiryYear(buyYear: number, type: 'ippan' | 'tsumitate'): number {
+  return buyYear + (type === 'ippan' ? 4 : 19)
 }
 
 /** 계좌 이름으로 관리 국가 추정 (기존 데이터 마이그레이션·기본값용) */
