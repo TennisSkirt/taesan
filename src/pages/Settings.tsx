@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useTheme } from '../theme'
-import { applyImportPlan, buildImportPlan, templateCsv } from '../lib/csvImport'
+import { applyImportPlan, buildImportPlan, parseCsv, templateCsv } from '../lib/csvImport'
+import { buildRakutenPlan, looksLikeRakuten } from '../lib/rakutenImport'
 import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
 import { DEFAULT_MAIN_CURRENCY } from '../lib/usePortfolio'
@@ -137,14 +138,32 @@ export default function Settings() {
     URL.revokeObjectURL(a.href)
   }
 
+  function decodeSmart(buf: ArrayBuffer): string {
+    const utf8 = new TextDecoder('utf-8').decode(buf)
+    if (!utf8.includes('�')) return utf8
+    // 라쿠텐(Shift_JIS)·한글 엑셀(EUC-KR) 자동 감지
+    const candidates: string[] = []
+    for (const enc of ['shift_jis', 'euc-kr']) {
+      try {
+        candidates.push(new TextDecoder(enc).decode(buf))
+      } catch {
+        /* 미지원 인코딩 무시 */
+      }
+    }
+    const scoreOf = (t: string) => {
+      let s = -(t.match(/�/g)?.length ?? 0) * 5
+      if (/約定日|銘柄|口座|受渡/.test(t)) s += 20
+      if (/구분|계좌|날짜|종목/.test(t)) s += 20
+      return s
+    }
+    return candidates.sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? utf8
+  }
+
   async function importCsv(file: File) {
     try {
-      const buf = await file.arrayBuffer()
-      // 엑셀 한글 CSV(EUC-KR) 자동 감지: UTF-8로 읽어 깨지면 재시도
-      let text = new TextDecoder('utf-8').decode(buf)
-      if (text.includes('�')) text = new TextDecoder('euc-kr').decode(buf)
-
-      const plan = buildImportPlan(text, accounts)
+      const text = decodeSmart(await file.arrayBuffer())
+      const isRakuten = looksLikeRakuten(parseCsv(text))
+      const plan = isRakuten ? buildRakutenPlan(text, accounts) : buildImportPlan(text, accounts)
       const total =
         plan.counts.buy + plan.counts.sell + plan.counts.dividend + plan.counts.cashIn + plan.counts.cashOut
       if (total === 0) {
@@ -152,6 +171,7 @@ export default function Settings() {
         return
       }
       const lines = [
+        isRakuten ? '📄 라쿠텐증권 형식으로 인식했어요' : '📄 태산 템플릿 형식으로 인식했어요',
         `매수 ${plan.counts.buy} · 매도 ${plan.counts.sell} · 배당 ${plan.counts.dividend} · 입금 ${plan.counts.cashIn} · 출금 ${plan.counts.cashOut}`,
       ]
       if (plan.accountsToCreate.length > 0)
@@ -466,7 +486,7 @@ export default function Settings() {
           <div className="item-main">
             <div className="item-name" style={{ fontSize: 15, fontWeight: 600 }}>CSV 가져오기</div>
             <div className="item-sub">
-              엑셀로 정리한 기록을 한 번에 등록 ·{' '}
+              라쿠텐증권 거래이력 CSV 또는 엑셀 정리본 ·{' '}
               <button
                 className="btn-ghost"
                 style={{ fontSize: 12 }}

@@ -85,14 +85,14 @@ function parseCurrency(s: string): Currency | null {
   return null
 }
 
-function parseNumber(s: string): number | null {
+export function parseNumber(s: string): number | null {
   const cleaned = s.replace(/[₩¥$,\s]/g, '')
   if (cleaned === '') return null
   const n = Number(cleaned)
   return isNaN(n) ? null : n
 }
 
-function parseDate(s: string): string | null {
+export function parseDate(s: string): string | null {
   const m = s.trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)
   if (!m) return null
   return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
