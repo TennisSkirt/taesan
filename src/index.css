@@ -520,6 +520,23 @@ button {
   font-variation-settings: 'FILL' 1;
 }
 
+/* 진행 바 */
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.progress > div {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.progress > div.over {
+  background: var(--up);
+}
+
 /* 잠금 화면 */
 .lock-screen {
   position: fixed;

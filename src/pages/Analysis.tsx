@@ -148,9 +148,77 @@ export default function Analysis() {
   }
   const nisaLots = [...lotMap.values()].sort((a, b) => a.expiry - b.expiry)
 
+  // 신NISA 한도 — 연간 360만·생애 1,800만 (취득가 기준)
+  const SHIN_ANNUAL = 3_600_000
+  const SHIN_LIFETIME = 18_000_000
+  const shinIds = new Set(
+    p.accounts.filter((a) => a.nisa && (a.nisaType ?? 'shin') === 'shin').map((a) => a.id!)
+  )
+  const toJPY = (amount: number, cur: Currency) => convert(amount, cur, 'JPY', p.fx)
+  const shinYearUsed = p.transactions
+    .filter((t) => t.type === 'buy' && shinIds.has(t.accountId) && t.date.startsWith(String(nowYear)))
+    .reduce((s, t) => s + toJPY(t.quantity * t.price, t.currency), 0)
+  const shinLifetimeUsed = p.holdings
+    .filter((h) => shinIds.has(h.accountId))
+    .reduce((s, h) => s + toJPY(h.invested, h.currency), 0)
+
   return (
     <main className="page">
       <TopBar title="분석" />
+
+      {shinIds.size > 0 && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="data_usage" size={19} color="var(--accent)" />
+            <div className="card-title">신NISA 한도</div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span className="label-sm">올해 투자 ({nowYear})</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {fmtMoney(shinYearUsed, 'JPY')}
+                <span className="hint"> / {fmtMoney(SHIN_ANNUAL, 'JPY')}</span>
+              </span>
+            </div>
+            <div className="progress" style={{ marginTop: 6 }}>
+              <div
+                className={shinYearUsed > SHIN_ANNUAL ? 'over' : ''}
+                style={{ width: `${Math.min(100, (shinYearUsed / SHIN_ANNUAL) * 100)}%` }}
+              />
+            </div>
+            <div className="hint" style={{ marginTop: 4 }}>
+              {shinYearUsed >= SHIN_ANNUAL
+                ? '올해 한도를 모두 사용했어요'
+                : `올해 ${fmtMoney(SHIN_ANNUAL - shinYearUsed, 'JPY')} 더 넣을 수 있어요`}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span className="label-sm">생애 한도</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {fmtMoney(shinLifetimeUsed, 'JPY')}
+                <span className="hint"> / {fmtMoney(SHIN_LIFETIME, 'JPY')}</span>
+              </span>
+            </div>
+            <div className="progress" style={{ marginTop: 6 }}>
+              <div
+                className={shinLifetimeUsed > SHIN_LIFETIME ? 'over' : ''}
+                style={{ width: `${Math.min(100, (shinLifetimeUsed / SHIN_LIFETIME) * 100)}%` }}
+              />
+            </div>
+            <div className="hint" style={{ marginTop: 4 }}>
+              남은 생애 한도 {fmtMoney(Math.max(0, SHIN_LIFETIME - shinLifetimeUsed), 'JPY')}
+            </div>
+          </div>
+
+          <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
+            취득가 기준, つみたて·성장투자枠 구분 없이 합산한 추정치예요. 매도한 만큼의 생애
+            한도는 다음 해에 부활합니다. 정확한 잔여 한도는 증권사 앱 기준으로 확인하세요.
+          </p>
+        </div>
+      )}
 
       {nisaLots.length > 0 && (
         <div className="card">
