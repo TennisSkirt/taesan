@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useTheme } from '../theme'
+import { applyImportPlan, buildImportPlan, templateCsv } from '../lib/csvImport'
 import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
 import { DEFAULT_MAIN_CURRENCY } from '../lib/usePortfolio'
@@ -41,6 +42,7 @@ export default function Settings() {
   const [newPw2, setNewPw2] = useState('')
   const [toast, setToast] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const csvRef = useRef<HTMLInputElement>(null)
 
   const usd = fxRate('USD', fx)
   const jpy = fxRate('JPY', fx)
@@ -124,6 +126,44 @@ export default function Settings() {
     }
     await db.accounts.delete(id)
     showToast('계좌를 삭제했어요')
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob(['﻿' + templateCsv()], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'taesan-template.csv'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  async function importCsv(file: File) {
+    try {
+      const buf = await file.arrayBuffer()
+      // 엑셀 한글 CSV(EUC-KR) 자동 감지: UTF-8로 읽어 깨지면 재시도
+      let text = new TextDecoder('utf-8').decode(buf)
+      if (text.includes('�')) text = new TextDecoder('euc-kr').decode(buf)
+
+      const plan = buildImportPlan(text, accounts)
+      const total =
+        plan.counts.buy + plan.counts.sell + plan.counts.dividend + plan.counts.cashIn + plan.counts.cashOut
+      if (total === 0) {
+        alert('가져올 수 있는 행이 없어요.\n' + plan.errors.slice(0, 5).join('\n'))
+        return
+      }
+      const lines = [
+        `매수 ${plan.counts.buy} · 매도 ${plan.counts.sell} · 배당 ${plan.counts.dividend} · 입금 ${plan.counts.cashIn} · 출금 ${plan.counts.cashOut}`,
+      ]
+      if (plan.accountsToCreate.length > 0)
+        lines.push(`새 계좌 생성: ${plan.accountsToCreate.map((a) => a.name).join(', ')}`)
+      if (plan.errors.length > 0)
+        lines.push(`⚠️ 건너뛰는 행 ${plan.errors.length}건:\n${plan.errors.slice(0, 5).join('\n')}`)
+      if (!confirm(`CSV에서 ${total}건을 가져올까요?\n\n${lines.join('\n')}`)) return
+      await applyImportPlan(plan)
+      showToast(`${total}건을 가져왔어요`)
+    } catch {
+      showToast('CSV를 읽지 못했어요')
+    }
   }
 
   async function exportData() {
@@ -416,6 +456,41 @@ export default function Settings() {
           >
             <span className="knob" />
           </button>
+        </div>
+
+        {/* CSV 가져오기 */}
+        <div className="list-item" style={{ cursor: 'pointer' }} onClick={() => csvRef.current?.click()}>
+          <div className="item-icon" style={{ width: 34, height: 34, borderRadius: 10 }}>
+            <Icon name="table_view" size={19} />
+          </div>
+          <div className="item-main">
+            <div className="item-name" style={{ fontSize: 15, fontWeight: 600 }}>CSV 가져오기</div>
+            <div className="item-sub">
+              엑셀로 정리한 기록을 한 번에 등록 ·{' '}
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 12 }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  downloadTemplate()
+                }}
+              >
+                템플릿 내려받기
+              </button>
+            </div>
+          </div>
+          <Icon name="chevron_right" size={20} color="var(--text-3)" />
+          <input
+            ref={csvRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) importCsv(f)
+              e.target.value = ''
+            }}
+          />
         </div>
 
         {/* 백업 */}
