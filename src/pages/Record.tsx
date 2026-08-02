@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import type { AssetClass, Currency, Market, Region } from '../types'
@@ -14,15 +15,11 @@ import {
   todayStr,
 } from '../lib/format'
 import Icon from '../components/Icon'
+import TopBar from '../components/TopBar'
 
 type Tab = 'buy' | 'sell' | 'dividend' | 'cash'
 type CashDir = 'in' | 'out'
 
-const REGION_SUGGESTIONS: Record<Region, string[]> = {
-  JP: ['라쿠텐증권', '라쿠텐 신NISA', 'SBI증권'],
-  KR: ['토스증권', 'NH투자증권', '카카오뱅크 저금'],
-  US: ['E*TRADE'],
-}
 /** 국가별 기본 종목 시장 */
 const REGION_MARKET: Record<Region, Market> = { JP: 'JP', KR: 'KR', US: 'US' }
 const IN_SOURCES = ['월급', '용돈', '이자', '기존 자산', '기타']
@@ -33,7 +30,6 @@ export default function Record() {
   const [tab, setTab] = useState<Tab>('buy')
   const [region, setRegion] = useState<Region>('JP')
   const [accountId, setAccountId] = useState<number | ''>('')
-  const [newAccount, setNewAccount] = useState('')
   const [market, setMarket] = useState<Market>('JP')
   const [assetClass, setAssetClass] = useState<AssetClass>('stock')
   const [symbol, setSymbol] = useState('')
@@ -105,21 +101,6 @@ export default function Record() {
     [],
     []
   )
-
-  async function addAccount() {
-    const nm = newAccount.trim()
-    if (!nm) return
-    const id = await db.accounts.add({
-      name: nm,
-      kind: 'brokerage',
-      region,
-      // 이름에 NISA/니사가 들어가면 자동으로 비과세 계좌 표시 (설정에서 변경 가능)
-      nisa: /nisa|니사/i.test(nm) || undefined,
-      createdAt: todayStr(),
-    })
-    setAccountId(id as number)
-    setNewAccount('')
-  }
 
   function showToast(msg: string) {
     setToast(msg)
@@ -210,7 +191,7 @@ export default function Record() {
 
   return (
     <main className="page">
-      <div className="page-title">기록</div>
+      <TopBar title="기록" />
 
       {/* 관리 국가 */}
       <div className="seg">
@@ -246,8 +227,8 @@ export default function Record() {
       {/* 계좌 */}
       <div>
         <div className="field-label">{tab === 'cash' ? (cashDir === 'in' ? '입금할 계좌' : '출금할 계좌') : '계좌'}</div>
-        {accounts.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+        {accounts.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {accounts.map((a) => (
               <button
                 key={a.id}
@@ -258,33 +239,19 @@ export default function Record() {
               </button>
             ))}
           </div>
-        )}
-        <div className="input">
-          <Icon name="add" size={19} color="var(--text-3)" />
-          <input
-            placeholder={
-              accounts.length === 0
-                ? `${REGION_LABEL[region]} 계좌 이름 입력 (예: ${REGION_SUGGESTIONS[region][0]})`
-                : `새 ${REGION_LABEL[region]} 계좌 추가`
-            }
-            value={newAccount}
-            onChange={(e) => setNewAccount(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addAccount()}
-          />
-          {newAccount.trim() !== '' && (
-            <button className="btn-ghost" onClick={addAccount}>
-              추가
-            </button>
-          )}
-        </div>
-        {accounts.length === 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-            {REGION_SUGGESTIONS[region].map((s) => (
-              <button key={s} className="chip-btn" onClick={() => setNewAccount(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
+        ) : (
+          <Link to="/settings" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div
+              className="card-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 15px', boxShadow: 'none' }}
+            >
+              <Icon name="add_circle" size={20} color="var(--accent)" />
+              <span className="label" style={{ flex: 1 }}>
+                {REGION_LABEL[region]} 계좌가 아직 없어요 — 설정에서 추가해주세요
+              </span>
+              <Icon name="chevron_right" size={18} color="var(--text-3)" />
+            </div>
+          </Link>
         )}
       </div>
 

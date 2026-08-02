@@ -12,6 +12,7 @@ import {
   REGIONS,
 } from '../lib/format'
 import Icon from '../components/Icon'
+import TopBar from '../components/TopBar'
 import type { Currency, Region } from '../types'
 
 const SLICE_COLORS = ['var(--up)', 'var(--down)', 'var(--accent)', 'var(--text-3)']
@@ -71,7 +72,7 @@ export default function Portfolio() {
 
   return (
     <main className="page">
-      <div className="page-title">자산</div>
+      <TopBar title="자산" />
 
       {/* 국가 선택 */}
       <div className="seg">

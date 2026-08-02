@@ -59,6 +59,27 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background 0.25s ease, color 0.25s ease;
+  /* 더블탭 확대 방지 (핀치 줌은 유지) + 탭 지연 제거 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+button,
+input,
+a {
+  touch-action: manipulation;
+}
+
+/* 숫자 입력 스피너 제거 */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 #root {
@@ -93,17 +114,33 @@ button {
 
 .page {
   flex: 1;
-  padding: 12px 18px calc(88px + env(safe-area-inset-bottom));
+  padding: 0 18px calc(88px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.page-title {
-  font-size: 22px;
+/* 고정 상단 바 */
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 -18px;
+  padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
+  background: var(--sheet);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--border);
+}
+
+.top-bar .t {
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  padding-top: 6px;
 }
 
 .section-head {
@@ -160,6 +197,11 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+/* 그리드 자식이 내용 폭 때문에 화면 밖으로 삐져나가는 것 방지 */
+.grid2 > * {
+  min-width: 0;
 }
 
 .up {
@@ -314,11 +356,13 @@ button {
 .input select {
   flex: 1;
   min-width: 0;
+  width: 100%;
   border: none;
   outline: none;
   background: transparent;
   font-family: inherit;
-  font-size: 15px;
+  /* 16px 미만이면 iOS가 포커스 시 화면을 강제 확대함 */
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
 }

@@ -5,9 +5,19 @@ import { useTheme } from '../theme'
 import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
 import { DEFAULT_MAIN_CURRENCY } from '../lib/usePortfolio'
-import { CURRENCY_LABEL, CURRENCY_SYMBOL, guessRegion, REGION_FLAG, REGIONS, todayStr } from '../lib/format'
+import {
+  CURRENCY_LABEL,
+  CURRENCY_SYMBOL,
+  guessRegion,
+  REGION_FLAG,
+  REGION_LABEL,
+  REGION_SUGGESTIONS,
+  REGIONS,
+  todayStr,
+} from '../lib/format'
 import type { Currency, Region } from '../types'
 import Icon from '../components/Icon'
+import TopBar from '../components/TopBar'
 
 const CURRENCIES: Currency[] = ['JPY', 'KRW', 'USD']
 
@@ -20,6 +30,8 @@ export default function Settings() {
   const lockRow = useLiveQuery(() => db.settings.get('appLock'), [], undefined)
   const lock = (lockRow?.value as LockData | undefined) ?? null
   const [showAccounts, setShowAccounts] = useState(false)
+  const [newAcctRegion, setNewAcctRegion] = useState<Region>('JP')
+  const [newAcctName, setNewAcctName] = useState('')
   const [showFx, setShowFx] = useState(false)
   const [showMain, setShowMain] = useState(false)
   const [showLock, setShowLock] = useState(false)
@@ -77,6 +89,21 @@ export default function Settings() {
     if (!isNaN(rate) && rate > 0) {
       await db.fxCache.put({ key, rate, updatedAt: todayStr() })
     }
+  }
+
+  async function addAccount() {
+    const nm = newAcctName.trim()
+    if (!nm) return
+    await db.accounts.add({
+      name: nm,
+      kind: 'brokerage',
+      region: newAcctRegion,
+      // 이름에 NISA/니사가 들어가면 자동으로 비과세 계좌 표시
+      nisa: /nisa|니사/i.test(nm) || undefined,
+      createdAt: todayStr(),
+    })
+    setNewAcctName('')
+    showToast('계좌를 추가했어요')
   }
 
   async function deleteAccount(id: number, name: string) {
@@ -146,7 +173,7 @@ export default function Settings() {
 
   return (
     <main className="page">
-      <div className="page-title">설정</div>
+      <TopBar title="설정" />
 
       <div className="list">
         {/* 메인 통화 */}
@@ -192,6 +219,41 @@ export default function Settings() {
           </div>
           <Icon name={showAccounts ? 'expand_less' : 'chevron_right'} size={20} color="var(--text-3)" />
         </div>
+        {showAccounts && (
+          <div className="list-item" style={{ background: 'var(--surface-2)' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="seg">
+                {REGIONS.map((r) => (
+                  <button key={r} className={newAcctRegion === r ? 'on' : ''} onClick={() => setNewAcctRegion(r)}>
+                    {REGION_FLAG[r]} {REGION_LABEL[r]}
+                  </button>
+                ))}
+              </div>
+              <div className="input" style={{ padding: '10px 12px' }}>
+                <input
+                  placeholder={`계좌 이름 (예: ${REGION_SUGGESTIONS[newAcctRegion][0]})`}
+                  value={newAcctName}
+                  onChange={(e) => setNewAcctName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addAccount()}
+                />
+                {newAcctName.trim() !== '' && (
+                  <button className="btn-ghost" onClick={addAccount}>
+                    추가
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {REGION_SUGGESTIONS[newAcctRegion]
+                  .filter((s) => !accounts.some((a) => a.name === s))
+                  .map((s) => (
+                    <button key={s} className="chip-btn" onClick={() => setNewAcctName(s)}>
+                      {s}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
         {showAccounts &&
           accounts.map((a) => {
             const region: Region = a.region ?? guessRegion(a.name)

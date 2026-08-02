@@ -15,6 +15,7 @@ import {
   todayStr,
 } from '../lib/format'
 import Icon from '../components/Icon'
+import TopBar from '../components/TopBar'
 
 function greeting(): string {
   const d = new Date()
@@ -48,12 +49,7 @@ export default function Dashboard() {
 
   return (
     <main className="page">
-      <div style={{ paddingTop: 4 }}>
-        <div className="label">{greeting()}</div>
-        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.01em', marginTop: 2 }}>
-          태산 🏔️
-        </div>
-      </div>
+      <TopBar title="태산 🏔️" right={<span className="hint">{greeting()}</span>} />
 
       <div className="card">
         <div className="label">총자산 · {CURRENCY_LABEL[p.main]} 환산</div>

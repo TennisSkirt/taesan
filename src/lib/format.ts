@@ -23,6 +23,13 @@ export const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
   fund: '투자신탁',
 }
 
+/** 국가별 계좌 이름 추천 (계좌 추가 UI용) */
+export const REGION_SUGGESTIONS: Record<Region, string[]> = {
+  JP: ['라쿠텐증권', '라쿠텐 신NISA', 'SBI증권'],
+  KR: ['토스증권', 'NH투자증권', '카카오뱅크 저금'],
+  US: ['E*TRADE'],
+}
+
 /** 계좌 이름으로 관리 국가 추정 (기존 데이터 마이그레이션·기본값용) */
 export function guessRegion(name: string): Region {
   if (/라쿠텐|rakuten|sbi|nisa|니사|노무라|다이와|마넥스|monex/i.test(name)) return 'JP'

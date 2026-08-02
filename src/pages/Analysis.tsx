@@ -4,6 +4,7 @@ import { convert, fxRate, toKRW } from '../lib/portfolio'
 import { CURRENCY_SYMBOL, fmtMoney } from '../lib/format'
 import type { Currency } from '../types'
 import Icon from '../components/Icon'
+import TopBar from '../components/TopBar'
 
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'JPY']
 
@@ -117,7 +118,7 @@ export default function Analysis() {
 
   return (
     <main className="page">
-      <div className="page-title">분석</div>
+      <TopBar title="분석" />
 
       <FxCalculator key={p.main} main={p.main} fx={p.fx} />
 
