@@ -548,7 +548,7 @@ export default function Settings() {
       </div>
 
       <div className="hint" style={{ textAlign: 'center', marginTop: 8 }}>
-        태산 1.0 · 환율 기본값 USD {DEFAULT_FX.USD} · JPY {DEFAULT_FX.JPY}
+        태산 · 빌드 {__BUILD_TIME__} · 환율 기본값 USD {DEFAULT_FX.USD} · JPY {DEFAULT_FX.JPY}
       </div>
 
       {toast && <div className="toast">{toast}</div>}

@@ -5,6 +5,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   // GitHub Pages: https://tennisskirt.github.io/taesan/
   base: '/taesan/',
+  define: {
+    // 설정 화면에 표시하는 빌드 시각 — "지금 최신 버전인가?" 확인용
+    __BUILD_TIME__: JSON.stringify(
+      new Date().toLocaleString('ko-KR', {
+        timeZone: 'Asia/Tokyo',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    ),
+  },
   build: {
     outDir: 'docs', // Pages "main 브랜치 /docs" 배포 방식
   },
