@@ -41,6 +41,15 @@ export function oldNisaExpiryYear(buyYear: number, type: 'ippan' | 'tsumitate'):
   return buyYear + (type === 'ippan' ? 4 : 19)
 }
 
+/** 투자신탁 이름 정규화 — 전각 통일, 괄호(애칭) 제거, 라쿠텐 '프라스' 개명 병합.
+ *  같은 펀드가 개명으로 다른 이름이 되어도 하나의 종목으로 합치기 위한 표준 키 */
+export function normalizeFundName(name: string): string {
+  let s = name.normalize('NFKC')
+  for (let i = 0; i < 3; i++) s = s.replace(/\([^()]*\)/g, '')
+  s = s.replace(/楽天・プラス・/g, '楽天・')
+  return s.replace(/\s+/g, '').trim()
+}
+
 /** 계좌 이름으로 관리 국가 추정 (기존 데이터 마이그레이션·기본값용) */
 export function guessRegion(name: string): Region {
   if (/라쿠텐|rakuten|sbi|nisa|니사|노무라|다이와|마넥스|monex/i.test(name)) return 'JP'

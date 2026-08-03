@@ -1,5 +1,5 @@
 import type { Account, Currency, Market, Region } from '../types'
-import { guessRegion } from './format'
+import { guessRegion, normalizeFundName } from './format'
 import { parseCsv, parseDate, parseNumber, type CsvImportPlan } from './csvImport'
 
 /** 라쿠텐증권 거래이력 CSV 파서
@@ -139,8 +139,12 @@ export function buildRakutenPlan(csvText: string, existingAccounts: Account[]): 
     if (!date || !name) continue // 합계·빈 행 등
     const accountName = routeAccount(get(r, acctCol))
     const rawCode = get(r, codeCol)
-    // 코드가 없는 투신은 이름으로 식별자 생성 (공백 제거 후 20자 — 유사 이름 충돌 방지)
-    const symbol = (rawCode || name.replace(/\s+/g, '').slice(0, 20)).toUpperCase()
+    // 코드가 없는 투신은 정규화한 이름을 식별자로 — 개명(楽天→楽天・プラス 등)돼도 같은 종목으로 병합
+    const symbol = rawCode
+      ? rawCode.toUpperCase()
+      : isFund
+        ? normalizeFundName(name)
+        : name.replace(/\s+/g, '').slice(0, 20).toUpperCase()
 
     if (isDividendFile) {
       const net = parseAmount(get(r, netCol))

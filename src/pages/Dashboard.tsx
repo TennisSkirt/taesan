@@ -114,7 +114,7 @@ export default function Dashboard() {
             {(refreshMsg || refreshedAt > 0) && (
               <div className="hint" style={{ marginTop: 8 }}>
                 {refreshMsg ||
-                  `시세 ${new Date(refreshedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 기준 · 투자신탁은 자산 탭에서 수동 입력`}
+                  `시세 ${new Date(refreshedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 기준 · 투자신탁은 전일 기준가액`}
               </div>
             )}
           </>
