@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { usePortfolio } from '../lib/usePortfolio'
+import { setManualPrice } from '../lib/quotes'
+import { usePortfolio, type HoldingView } from '../lib/usePortfolio'
 import {
   ASSET_CLASS_LABEL,
   CURRENCY_SYMBOL,
@@ -20,6 +22,17 @@ const SLICE_COLORS = ['var(--up)', 'var(--down)', 'var(--accent)', 'var(--text-3
 export default function Portfolio() {
   const p = usePortfolio()
   const [params, setParams] = useSearchParams()
+  const [editKey, setEditKey] = useState('')
+  const [editVal, setEditVal] = useState('')
+
+  async function savePrice(h: HoldingView) {
+    const v = Number(editVal)
+    if (isNaN(v) || v <= 0) return
+    // 투자신탁은 1만 구좌당 기준가액으로 입력받아 구좌당 단가로 저장
+    await setManualPrice(h, h.assetClass === 'fund' ? v / 10000 : v)
+    setEditKey('')
+    setEditVal('')
+  }
   const region: Region = (['JP', 'KR', 'US'].includes(params.get('r') ?? '') ? params.get('r') : 'JP') as Region
   const regionCur = REGION_CURRENCY[region]
   const summary = p.byRegion[region]
@@ -220,25 +233,78 @@ export default function Portfolio() {
                 <div className="t">종목별</div>
               </div>
               <div className="list">
-                {holdings.map((h) => (
-                  <div className="list-item" key={`${h.accountId}:${h.market}:${h.symbol}`}>
-                    <div className="item-icon">{h.market}</div>
-                    <div className="item-main">
-                      <div className="item-name">{h.name}</div>
-                      <div className="item-sub">
-                        {ASSET_CLASS_LABEL[h.assetClass] ?? '주식'} · 평단 {fmtMoney(h.avgCost, h.currency)} ·{' '}
-                        {h.qty.toLocaleString('ko-KR')}
-                        {h.assetClass === 'fund' ? '구' : '주'}
+                {holdings.map((h) => {
+                  const key = `${h.accountId}:${h.market}:${h.symbol}`
+                  const editing = editKey === key
+                  return (
+                    <div key={key}>
+                      <div
+                        className="list-item"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          setEditKey(editing ? '' : key)
+                          setEditVal('')
+                        }}
+                      >
+                        <div className="item-icon">{h.market}</div>
+                        <div className="item-main">
+                          <div className="item-name">{h.name}</div>
+                          <div className="item-sub">
+                            {ASSET_CLASS_LABEL[h.assetClass] ?? '주식'} · 평단{' '}
+                            {h.assetClass === 'fund'
+                              ? `${fmtMoney(h.avgCost * 10000, h.currency)}(1만구)`
+                              : fmtMoney(h.avgCost, h.currency)}{' '}
+                            · {h.qty.toLocaleString('ko-KR')}
+                            {h.assetClass === 'fund' ? '구' : '주'}
+                          </div>
+                        </div>
+                        <div className="item-right">
+                          <div className="item-value">{fmtMoney(h.value, h.currency)}</div>
+                          <div className={`item-ret ${h.gain >= 0 ? 'up' : 'down'}`}>
+                            {fmtPct(h.gainPct)} · {fmtMoney(h.gain, h.currency)}
+                          </div>
+                        </div>
                       </div>
+                      {editing && (
+                        <div className="list-item" style={{ background: 'var(--surface-2)' }}>
+                          <div style={{ flex: 1 }}>
+                            <div className="field-label" style={{ marginBottom: 6 }}>
+                              {h.assetClass === 'fund' ? '기준가액 (1만 구좌당)' : '현재가'} · {h.currency}
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <div className="input" style={{ flex: 1, padding: '10px 12px' }}>
+                                <span className="unit">{CURRENCY_SYMBOL[h.currency]}</span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder={String(
+                                    h.assetClass === 'fund' ? Math.round(h.price * 10000) : h.price
+                                  )}
+                                  value={editVal}
+                                  autoFocus
+                                  onChange={(e) => setEditVal(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && savePrice(h)}
+                                />
+                              </div>
+                              <button
+                                className="btn-primary"
+                                style={{ width: 'auto', padding: '10px 18px', fontSize: 14 }}
+                                onClick={() => savePrice(h)}
+                              >
+                                저장
+                              </button>
+                            </div>
+                            <p className="hint" style={{ marginTop: 6 }}>
+                              {h.assetClass === 'fund'
+                                ? '증권사 앱에 보이는 기준가액을 그대로 입력하세요'
+                                : '시세 새로고침(홈)으로도 자동 갱신됩니다'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="item-right">
-                      <div className="item-value">{fmtMoney(h.value, h.currency)}</div>
-                      <div className={`item-ret ${h.gain >= 0 ? 'up' : 'down'}`}>
-                        {fmtPct(h.gainPct)} · {fmtMoney(h.gain, h.currency)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </>
           )}

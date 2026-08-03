@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
+import { refreshQuotes } from '../lib/quotes'
 import { usePortfolio } from '../lib/usePortfolio'
 import {
   CURRENCY_LABEL,
@@ -23,10 +24,43 @@ function greeting(): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 · ${days[d.getDay()]}`
 }
 
+const AUTO_REFRESH_MS = 10 * 60 * 1000
+
 export default function Dashboard() {
   const p = usePortfolio()
   const accountName = (id: number) => p.accounts.find((a) => a.id === id)?.name ?? ''
   const snapshots = useLiveQuery(() => db.snapshots.orderBy('date').toArray(), [], [])
+  const refreshedRow = useLiveQuery(() => db.settings.get('quotesRefreshedAt'), [], undefined)
+  const refreshedAt = (refreshedRow?.value as number | undefined) ?? 0
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState('')
+  const autoTried = useRef(false)
+
+  async function doRefresh() {
+    if (refreshing || p.holdings.length === 0) return
+    setRefreshing(true)
+    try {
+      const r = await refreshQuotes(p.holdings)
+      setRefreshMsg(
+        r.updated > 0 || r.fxUpdated
+          ? r.failed.length > 0
+            ? `시세 ${r.updated}종목 갱신 · 실패: ${r.failed.slice(0, 3).join(', ')}`
+            : `시세 ${r.updated}종목 · 환율 갱신 완료`
+          : '시세를 가져오지 못했어요 — 잠시 후 다시 시도해주세요'
+      )
+    } finally {
+      setRefreshing(false)
+      setTimeout(() => setRefreshMsg(''), 3000)
+    }
+  }
+
+  // 앱을 열었을 때 시세가 오래됐으면 자동 갱신
+  useEffect(() => {
+    if (autoTried.current || p.holdings.length === 0 || !navigator.onLine) return
+    if (Date.now() - refreshedAt < AUTO_REFRESH_MS) return
+    autoTried.current = true
+    doRefresh()
+  }, [p.holdings.length, refreshedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const trend = snapshots.slice(-30)
   const maxV = Math.max(...trend.map((s) => s.totalKRW), 1)
@@ -49,7 +83,19 @@ export default function Dashboard() {
 
   return (
     <main className="page">
-      <TopBar title="태산 🏔️" right={<span className="hint">{greeting()}</span>} />
+      <TopBar
+        title="태산 🏔️"
+        right={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="hint">{greeting()}</span>
+            {p.holdings.length > 0 && (
+              <button className="btn-ghost" onClick={doRefresh} aria-label="시세 새로고침" style={{ padding: 2 }}>
+                <Icon name={refreshing ? 'progress_activity' : 'refresh'} size={20} className={refreshing ? 'spin' : ''} />
+              </button>
+            )}
+          </div>
+        }
+      />
 
       <div className="card">
         <div className="label">총자산 · {CURRENCY_LABEL[p.main]} 환산</div>
@@ -57,13 +103,21 @@ export default function Dashboard() {
           {fmtMoney(p.toMain(p.totalKRW), p.main)}
         </div>
         {p.hasData ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <span className={`chip ${p.totalGainKRW >= 0 ? 'up' : 'down'}`}>
-              <Icon name={p.totalGainKRW >= 0 ? 'arrow_drop_up' : 'arrow_drop_down'} size={15} fill />
-              {fmtSignedMoney(p.toMain(p.totalGainKRW), p.main)}
-            </span>
-            <span className="hint">배당 포함 · 전체 기간</span>
-          </div>
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+              <span className={`chip ${p.totalGainKRW >= 0 ? 'up' : 'down'}`}>
+                <Icon name={p.totalGainKRW >= 0 ? 'arrow_drop_up' : 'arrow_drop_down'} size={15} fill />
+                {fmtSignedMoney(p.toMain(p.totalGainKRW), p.main)}
+              </span>
+              <span className="hint">배당 포함 · 전체 기간</span>
+            </div>
+            {(refreshMsg || refreshedAt > 0) && (
+              <div className="hint" style={{ marginTop: 8 }}>
+                {refreshMsg ||
+                  `시세 ${new Date(refreshedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 기준 · 투자신탁은 자산 탭에서 수동 입력`}
+              </div>
+            )}
+          </>
         ) : (
           <p className="hint" style={{ marginTop: 10, lineHeight: 1.5 }}>
             아직 기록이 없어요. 기록 탭에서 첫 매수를 입력하면
