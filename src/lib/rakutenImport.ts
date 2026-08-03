@@ -88,7 +88,8 @@ export function buildRakutenPlan(csvText: string, existingAccounts: Account[]): 
   const isFund = H.some((h) => h === 'ファンド名')
   const priceIsUSD = priceCol >= 0 && /ドル/.test(H[priceCol])
   const isUS = H.some((h) => h === 'ティッカー') || priceIsUSD
-  const isDividendFile = netCol >= 0 && qtyCol < 0
+  // 배당 파일: 受取金額이 있고, 매매 구분 열이 없거나 配当 관련 열이 있으면
+  const isDividendFile = netCol >= 0 && (sideCol < 0 || H.some((h) => h.includes('配当')))
 
   if (dateCol < 0 || nameCol < 0) {
     plan.errors.push('날짜·종목명 열을 찾지 못했어요. 파일을 공유해주시면 형식을 추가할게요.')
