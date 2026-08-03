@@ -99,9 +99,16 @@ export default function Analysis() {
   const p = usePortfolio()
   const year = new Date().getFullYear()
 
+  // 배당 캘린더 — 연도를 넘겨가며 볼 수 있게
+  const [divYear, setDivYear] = useState(year)
+  const divYears = [...new Set(p.dividends.map((d) => Number(d.date.slice(0, 4))))]
+  const minDivYear = divYears.length > 0 ? Math.min(...divYears) : year
+  const selectedDivs = p.dividends.filter((d) => d.date.startsWith(String(divYear)))
+  const divYearTotalKRW = selectedDivs.reduce((s, d) => s + toKRW(d.amountNet, d.currency, p.fx), 0)
+
   // 월별 배당 (세후, 원화 기준으로 합산 후 메인 통화 표시)
   const monthly = Array.from({ length: 12 }, () => 0)
-  for (const d of p.yearDividends) {
+  for (const d of selectedDivs) {
     const m = Number(d.date.slice(5, 7)) - 1
     if (m >= 0 && m < 12) monthly[m] += toKRW(d.amountNet, d.currency, p.fx)
   }
@@ -264,16 +271,38 @@ export default function Analysis() {
       <FxCalculator key={p.main} main={p.main} fx={p.fx} />
 
       <div className="card">
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="card-title">배당 캘린더</div>
-          <div className="label-sm">
-            {year} · 총{' '}
-            <span className="up" style={{ fontWeight: 700 }}>
-              {fmtMoney(p.toMain(p.divYearKRW), p.main)}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button
+              className="btn-ghost"
+              disabled={divYear <= minDivYear}
+              style={{ opacity: divYear <= minDivYear ? 0.3 : 1, padding: 4 }}
+              onClick={() => setDivYear(divYear - 1)}
+              aria-label="이전 연도"
+            >
+              <Icon name="chevron_left" size={20} />
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 800, minWidth: 44, textAlign: 'center' }}>{divYear}</span>
+            <button
+              className="btn-ghost"
+              disabled={divYear >= year}
+              style={{ opacity: divYear >= year ? 0.3 : 1, padding: 4 }}
+              onClick={() => setDivYear(divYear + 1)}
+              aria-label="다음 연도"
+            >
+              <Icon name="chevron_right" size={20} />
+            </button>
           </div>
         </div>
-        {p.yearDividends.length > 0 ? (
+        <div className="label-sm" style={{ marginTop: 6 }}>
+          {divYear}년 세후{' '}
+          <span className="up" style={{ fontWeight: 700 }}>
+            {fmtMoney(p.toMain(divYearTotalKRW), p.main)}
+          </span>
+          {' · '}누적 {fmtMoney(p.toMain(p.divNetKRW), p.main)}
+        </div>
+        {selectedDivs.length > 0 ? (
           <>
             <svg viewBox="0 0 300 96" style={{ width: '100%', height: 96, marginTop: 14, display: 'block' }}>
               {bars.map((b, i) => (
@@ -290,7 +319,9 @@ export default function Analysis() {
           </>
         ) : (
           <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
-            기록 탭에서 배당을 입력하면 월별 배당 그래프가 그려집니다.
+            {p.dividends.length > 0
+              ? `${divYear}년에는 배당 기록이 없어요. ◀ ▶ 로 다른 연도를 볼 수 있습니다.`
+              : '기록 탭에서 배당을 입력하면 월별 배당 그래프가 그려집니다.'}
           </p>
         )}
       </div>
