@@ -15,9 +15,10 @@ import { parseCsv, parseDate, parseNumber, type CsvImportPlan } from './csvImpor
  */
 
 export function looksLikeRakuten(rows: string[][]): boolean {
+  // 거래이력(約定日/受渡日)뿐 아니라 배당 파일(入金日/銘柄/口座/配当)도 인식해야 함
   return rows
     .slice(0, 10)
-    .some((r) => r.some((c) => /約定日|銘柄名|ファンド名|ティッカー|口座区分|受渡日/.test(c)))
+    .some((r) => r.some((c) => /約定日|受渡日|入金日|銘柄|ファンド名|ティッカー|口座|配当/.test(c)))
 }
 
 function emptyPlan(): CsvImportPlan {

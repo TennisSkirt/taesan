@@ -21,6 +21,27 @@ export interface CsvImportPlan {
   counts: { buy: number; sell: number; dividend: number; cashIn: number; cashOut: number }
 }
 
+/** CSV 바이트 디코딩 — UTF-8 우선, 깨지면 Shift_JIS(라쿠텐)·EUC-KR(한글 엑셀) 중 점수로 선택 */
+export function decodeCsvBuffer(buf: ArrayBuffer): string {
+  const utf8 = new TextDecoder('utf-8').decode(buf)
+  if (!utf8.includes('�')) return utf8
+  const candidates: string[] = []
+  for (const enc of ['shift_jis', 'euc-kr']) {
+    try {
+      candidates.push(new TextDecoder(enc).decode(buf))
+    } catch {
+      /* 미지원 인코딩 무시 */
+    }
+  }
+  const scoreOf = (t: string) => {
+    let s = -(t.match(/�/g)?.length ?? 0) * 5
+    if (/約定日|受渡日|入金日|銘柄|口座|配当/.test(t)) s += 20
+    if (/구분|계좌|날짜|종목/.test(t)) s += 20
+    return s
+  }
+  return candidates.sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? utf8
+}
+
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = []

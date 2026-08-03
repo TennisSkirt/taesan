@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useTheme } from '../theme'
-import { applyImportPlan, buildImportPlan, parseCsv, templateCsv } from '../lib/csvImport'
+import { applyImportPlan, buildImportPlan, decodeCsvBuffer, parseCsv, templateCsv } from '../lib/csvImport'
 import { buildRakutenPlan, looksLikeRakuten } from '../lib/rakutenImport'
 import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
@@ -138,30 +138,9 @@ export default function Settings() {
     URL.revokeObjectURL(a.href)
   }
 
-  function decodeSmart(buf: ArrayBuffer): string {
-    const utf8 = new TextDecoder('utf-8').decode(buf)
-    if (!utf8.includes('�')) return utf8
-    // 라쿠텐(Shift_JIS)·한글 엑셀(EUC-KR) 자동 감지
-    const candidates: string[] = []
-    for (const enc of ['shift_jis', 'euc-kr']) {
-      try {
-        candidates.push(new TextDecoder(enc).decode(buf))
-      } catch {
-        /* 미지원 인코딩 무시 */
-      }
-    }
-    const scoreOf = (t: string) => {
-      let s = -(t.match(/�/g)?.length ?? 0) * 5
-      if (/約定日|銘柄|口座|受渡/.test(t)) s += 20
-      if (/구분|계좌|날짜|종목/.test(t)) s += 20
-      return s
-    }
-    return candidates.sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? utf8
-  }
-
   async function importCsv(file: File) {
     try {
-      const text = decodeSmart(await file.arrayBuffer())
+      const text = decodeCsvBuffer(await file.arrayBuffer())
       const isRakuten = looksLikeRakuten(parseCsv(text))
       const plan = isRakuten ? buildRakutenPlan(text, accounts) : buildImportPlan(text, accounts)
       const total =
