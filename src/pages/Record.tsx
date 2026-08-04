@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { searchSymbols, type SymbolHit } from '../lib/symbolSearch'
 import { db } from '../db'
 import type { AssetClass, Currency, Market, Region } from '../types'
 import {
@@ -41,6 +42,11 @@ export default function Record() {
   const [gross, setGross] = useState('')
   const [net, setNet] = useState('')
   // 입출금
+  // 종목 검색
+  const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<SymbolHit[]>([])
+  const [searching, setSearching] = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [cashDir, setCashDir] = useState<CashDir>('in')
   const [cashCurrency, setCashCurrency] = useState<Currency>('KRW')
   const [cashAmount, setCashAmount] = useState('')
@@ -101,6 +107,35 @@ export default function Record() {
     [],
     []
   )
+
+  // 시장이 바뀌면 검색 상태 초기화
+  useEffect(() => {
+    setQuery('')
+    setHits([])
+  }, [market])
+
+  function onQueryChange(v: string) {
+    setQuery(v)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (v.trim().length < 1) {
+      setHits([])
+      return
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true)
+      const results = await searchSymbols(market, v)
+      setSearching(false)
+      setHits(results)
+    }, 350)
+  }
+
+  function pickHit(h: SymbolHit) {
+    setName(h.name)
+    setSymbol(h.symbol)
+    if (tab !== 'dividend') setAssetClass(h.assetClass)
+    setQuery('')
+    setHits([])
+  }
 
   function showToast(msg: string) {
     setToast(msg)
@@ -337,7 +372,50 @@ export default function Record() {
             </div>
           </div>
 
-          {/* 종목 */}
+          {/* 종목 검색 */}
+          <div>
+            <div className="field-label">종목 검색</div>
+            <div className="input">
+              <Icon name="search" size={19} color="var(--text-3)" />
+              <input
+                placeholder={
+                  market === 'KR'
+                    ? '삼성전자, TIGER 미국S&P500…'
+                    : market === 'US'
+                      ? 'JEPI, apple…'
+                      : '7203, toyota… (코드·영문)'
+                }
+                value={query}
+                onChange={(e) => onQueryChange(e.target.value)}
+              />
+              {searching && <Icon name="progress_activity" size={18} color="var(--text-3)" className="spin" />}
+            </div>
+            {hits.length > 0 && (
+              <div className="list" style={{ marginTop: 8 }}>
+                {hits.map((h) => (
+                  <div
+                    key={`${h.market}:${h.symbol}`}
+                    className="list-item"
+                    style={{ cursor: 'pointer', padding: '11px 14px' }}
+                    onClick={() => pickHit(h)}
+                  >
+                    <div className="item-icon" style={{ width: 32, height: 32, borderRadius: 9, fontSize: 10 }}>
+                      {h.market}
+                    </div>
+                    <div className="item-main">
+                      <div className="item-name" style={{ fontSize: 14 }}>{h.name}</div>
+                      <div className="item-sub">
+                        {h.symbol} · {h.sub}
+                      </div>
+                    </div>
+                    <Icon name="add_circle" size={18} color="var(--accent)" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 종목 (검색으로 자동 입력 · 직접 수정 가능) */}
           <div className="grid2">
             <div>
               <div className="field-label">종목명</div>

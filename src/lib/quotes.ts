@@ -25,7 +25,7 @@ async function fetchJson(url: string, timeoutMs = 8000): Promise<unknown> {
   }
 }
 
-async function fetchViaProxy(url: string): Promise<unknown> {
+export async function fetchViaProxy(url: string): Promise<unknown> {
   for (const proxy of PROXIES) {
     const data = await fetchJson(proxy(url))
     if (data) return data
