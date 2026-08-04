@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { setManualPrice } from '../lib/quotes'
 import { usePortfolio, type HoldingView } from '../lib/usePortfolio'
 import {
@@ -21,6 +21,7 @@ const SLICE_COLORS = ['var(--up)', 'var(--down)', 'var(--accent)', 'var(--text-3
 
 export default function Portfolio() {
   const p = usePortfolio()
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [editKey, setEditKey] = useState('')
   const [editVal, setEditVal] = useState('')
@@ -268,6 +269,28 @@ export default function Portfolio() {
                       {editing && (
                         <div className="list-item" style={{ background: 'var(--surface-2)' }}>
                           <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                              {(
+                                [
+                                  ['buy', '➕ 매수 추가'],
+                                  ['sell', '매도'],
+                                  ['dividend', '배당'],
+                                ] as const
+                              ).map(([tt, label]) => (
+                                <button
+                                  key={tt}
+                                  className="chip-btn"
+                                  style={{ flex: 1, padding: '9px 0' }}
+                                  onClick={() =>
+                                    navigate(
+                                      `/record?t=${tt}&a=${h.accountId}&mk=${h.market}&s=${encodeURIComponent(h.symbol)}`
+                                    )
+                                  }
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
                             <div className="field-label" style={{ marginBottom: 6 }}>
                               {h.assetClass === 'fund' ? '기준가액 (1만 구좌당)' : '현재가'} · {h.currency}
                             </div>

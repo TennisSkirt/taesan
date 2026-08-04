@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { searchSymbols, type SymbolHit } from '../lib/symbolSearch'
 import { db } from '../db'
@@ -113,6 +113,37 @@ export default function Record() {
     setQuery('')
     setHits([])
   }, [market])
+
+  // 자산 탭에서 "매수 추가/매도/배당"으로 넘어온 경우 — 계좌·종목 미리 채움
+  const [prefillParams, setPrefillParams] = useSearchParams()
+  useEffect(() => {
+    const a = prefillParams.get('a')
+    if (!a) return
+    const t = prefillParams.get('t')
+    const mk = prefillParams.get('mk') as Market | null
+    const s = prefillParams.get('s')
+    ;(async () => {
+      const acct = await db.accounts.get(Number(a))
+      if (!acct) return
+      setRegion(acct.region ?? guessRegion(acct.name))
+      setAccountId(acct.id!)
+      if (mk) {
+        setMarket(mk)
+        setCashCurrency(MARKET_CURRENCY[mk])
+      }
+      if (t === 'buy' || t === 'sell' || t === 'dividend') setTab(t)
+      if (s && mk) {
+        setSymbol(s)
+        const tx = await db.transactions.where('[market+symbol]').equals([mk, s]).last()
+        if (tx) {
+          setName(tx.name)
+          setAssetClass(tx.assetClass)
+        }
+      }
+      setPrefillParams({}, { replace: true })
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function onQueryChange(v: string) {
     setQuery(v)
