@@ -1,10 +1,19 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useTheme } from '../theme'
 import { applyImportPlan, buildImportPlan, decodeCsvBuffer, parseCsv, templateCsv } from '../lib/csvImport'
 import { buildRakutenPlan, looksLikeRakuten } from '../lib/rakutenImport'
-import { removeLock, setLockPassword, verifyPassword, type LockData } from '../lib/lock'
+import {
+  bioAvailable,
+  enrollBio,
+  removeBio,
+  removeLock,
+  setLockPassword,
+  verifyPassword,
+  type BioData,
+  type LockData,
+} from '../lib/lock'
 import { DEFAULT_FX, fxRate } from '../lib/portfolio'
 import { DEFAULT_MAIN_CURRENCY } from '../lib/usePortfolio'
 import {
@@ -32,6 +41,12 @@ export default function Settings() {
   const main = (mainSetting?.value as Currency | undefined) ?? DEFAULT_MAIN_CURRENCY
   const lockRow = useLiveQuery(() => db.settings.get('appLock'), [], undefined)
   const lock = (lockRow?.value as LockData | undefined) ?? null
+  const bioRow = useLiveQuery(() => db.settings.get('bioUnlock'), [], undefined)
+  const bio = (bioRow?.value as BioData | undefined) ?? null
+  const [bioAvail, setBioAvail] = useState(false)
+  useEffect(() => {
+    bioAvailable().then(setBioAvail)
+  }, [])
   const [showAccounts, setShowAccounts] = useState(false)
   const [newAcctRegion, setNewAcctRegion] = useState<Region>('JP')
   const [newAcctName, setNewAcctName] = useState('')
@@ -77,6 +92,21 @@ export default function Settings() {
     clearPwInputs()
     setShowLock(false)
     showToast('비밀번호를 바꿨어요')
+  }
+
+  async function toggleBio() {
+    if (!lock) return
+    if (bio) {
+      await removeBio()
+      showToast('생체인증을 껐어요')
+      return
+    }
+    if (!(await verifyPassword(curPw, lock))) {
+      showToast('현재 비밀번호를 먼저 입력해주세요')
+      return
+    }
+    const ok = await enrollBio()
+    showToast(ok ? '생체인증을 켰어요' : '이 기기에서 생체인증을 등록하지 못했어요')
   }
 
   async function disableLock() {
@@ -414,18 +444,30 @@ export default function Settings() {
                 />
               </div>
               {lock ? (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-primary" style={{ flex: 1, padding: 12, fontSize: 14 }} onClick={changeLock}>
-                    비밀번호 변경
-                  </button>
-                  <button
-                    className="chip-btn"
-                    style={{ flex: 1, borderRadius: 16, color: 'var(--up)' }}
-                    onClick={disableLock}
-                  >
-                    잠금 끄기
-                  </button>
-                </div>
+                <>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-primary" style={{ flex: 1, padding: 12, fontSize: 14 }} onClick={changeLock}>
+                      비밀번호 변경
+                    </button>
+                    <button
+                      className="chip-btn"
+                      style={{ flex: 1, borderRadius: 16, color: 'var(--up)' }}
+                      onClick={disableLock}
+                    >
+                      잠금 끄기
+                    </button>
+                  </div>
+                  {bioAvail && (
+                    <button
+                      className={`chip-btn ${bio ? 'on' : ''}`}
+                      style={{ padding: 12, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      onClick={toggleBio}
+                    >
+                      <Icon name="fingerprint" size={17} />
+                      {bio ? '생체인증 사용 중 — 누르면 끄기' : '생체인증 켜기 (현재 비밀번호 입력 후)'}
+                    </button>
+                  )}
+                </>
               ) : (
                 <button className="btn-primary" style={{ padding: 12, fontSize: 14 }} onClick={enableLock}>
                   잠금 켜기
