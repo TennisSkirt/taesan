@@ -101,6 +101,8 @@ export default function Analysis() {
 
   // 배당 캘린더 — 연도를 넘겨가며 볼 수 있게
   const [divYear, setDivYear] = useState(year)
+  const [showShin, setShowShin] = useState(false)
+  const [showOldNisa, setShowOldNisa] = useState(false)
   const divYears = [...new Set(p.dividends.map((d) => Number(d.date.slice(0, 4))))]
   const minDivYear = divYears.length > 0 ? Math.min(...divYears) : year
   const selectedDivs = p.dividends.filter((d) => d.date.startsWith(String(divYear)))
@@ -173,101 +175,6 @@ export default function Analysis() {
     <main className="page">
       <TopBar title="분석" />
 
-      {shinIds.size > 0 && (
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="data_usage" size={19} color="var(--accent)" />
-            <div className="card-title">신NISA 한도</div>
-          </div>
-
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span className="label-sm">올해 투자 ({nowYear})</span>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>
-                {fmtMoney(shinYearUsed, 'JPY')}
-                <span className="hint"> / {fmtMoney(SHIN_ANNUAL, 'JPY')}</span>
-              </span>
-            </div>
-            <div className="progress" style={{ marginTop: 6 }}>
-              <div
-                className={shinYearUsed > SHIN_ANNUAL ? 'over' : ''}
-                style={{ width: `${Math.min(100, (shinYearUsed / SHIN_ANNUAL) * 100)}%` }}
-              />
-            </div>
-            <div className="hint" style={{ marginTop: 4 }}>
-              {shinYearUsed >= SHIN_ANNUAL
-                ? '올해 한도를 모두 사용했어요'
-                : `올해 ${fmtMoney(SHIN_ANNUAL - shinYearUsed, 'JPY')} 더 넣을 수 있어요`}
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span className="label-sm">생애 한도</span>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>
-                {fmtMoney(shinLifetimeUsed, 'JPY')}
-                <span className="hint"> / {fmtMoney(SHIN_LIFETIME, 'JPY')}</span>
-              </span>
-            </div>
-            <div className="progress" style={{ marginTop: 6 }}>
-              <div
-                className={shinLifetimeUsed > SHIN_LIFETIME ? 'over' : ''}
-                style={{ width: `${Math.min(100, (shinLifetimeUsed / SHIN_LIFETIME) * 100)}%` }}
-              />
-            </div>
-            <div className="hint" style={{ marginTop: 4 }}>
-              남은 생애 한도 {fmtMoney(Math.max(0, SHIN_LIFETIME - shinLifetimeUsed), 'JPY')}
-            </div>
-          </div>
-
-          <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
-            취득가 기준, つみたて·성장투자枠 구분 없이 합산한 추정치예요. 매도한 만큼의 생애
-            한도는 다음 해에 부활합니다. 정확한 잔여 한도는 증권사 앱 기준으로 확인하세요.
-          </p>
-        </div>
-      )}
-
-      {nisaLots.length > 0 && (
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="hourglass_bottom" size={19} color="var(--accent)" />
-            <div className="card-title">구NISA 비과세 만료</div>
-          </div>
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {nisaLots.map((l, i) => {
-              const status =
-                l.expiry < nowYear
-                  ? { text: '만료됨 · 과세계좌 이관', color: 'var(--up)', bold: true }
-                  : l.expiry === nowYear
-                    ? { text: '올해 말 만료!', color: 'var(--up)', bold: true }
-                    : { text: `${l.expiry - nowYear}년 남음`, color: 'var(--text-3)', bold: false }
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {l.name}
-                    </div>
-                    <div className="hint">
-                      {l.accountName} · {NISA_TYPE_LABEL[l.nisaType]} · {l.buyYear}년 매수
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flex: 'none' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>{l.expiry}년 말</div>
-                    <div style={{ fontSize: 12, fontWeight: status.bold ? 800 : 600, color: status.color }}>
-                      {status.text}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
-            만료되면 과세계좌로 자동 이관되고, 이관 시점의 시가가 새 취득가가 됩니다. 만료 전에
-            계속 보유할지 매도할지 정해두는 게 좋아요.
-          </p>
-        </div>
-      )}
-
       <FxCalculator key={p.main} main={p.main} fx={p.fx} />
 
       <div className="card">
@@ -325,6 +232,123 @@ export default function Analysis() {
           </p>
         )}
       </div>
+
+      {shinIds.size > 0 && (
+        <div className="card">
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+            onClick={() => setShowShin(!showShin)}
+          >
+            <Icon name="data_usage" size={19} color="var(--accent)" />
+            <div className="card-title">신NISA 한도</div>
+            <div style={{ flex: 1 }} />
+            <span className="hint">
+              올해 {fmtMoney(Math.max(0, SHIN_ANNUAL - shinYearUsed), 'JPY')} 남음
+            </span>
+            <Icon name={showShin ? 'expand_less' : 'expand_more'} size={20} color="var(--text-3)" />
+          </div>
+
+          {showShin && (
+            <>
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span className="label-sm">올해 투자 ({nowYear})</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {fmtMoney(shinYearUsed, 'JPY')}
+                <span className="hint"> / {fmtMoney(SHIN_ANNUAL, 'JPY')}</span>
+              </span>
+            </div>
+            <div className="progress" style={{ marginTop: 6 }}>
+              <div
+                className={shinYearUsed > SHIN_ANNUAL ? 'over' : ''}
+                style={{ width: `${Math.min(100, (shinYearUsed / SHIN_ANNUAL) * 100)}%` }}
+              />
+            </div>
+            <div className="hint" style={{ marginTop: 4 }}>
+              {shinYearUsed >= SHIN_ANNUAL
+                ? '올해 한도를 모두 사용했어요'
+                : `올해 ${fmtMoney(SHIN_ANNUAL - shinYearUsed, 'JPY')} 더 넣을 수 있어요`}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span className="label-sm">생애 한도</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {fmtMoney(shinLifetimeUsed, 'JPY')}
+                <span className="hint"> / {fmtMoney(SHIN_LIFETIME, 'JPY')}</span>
+              </span>
+            </div>
+            <div className="progress" style={{ marginTop: 6 }}>
+              <div
+                className={shinLifetimeUsed > SHIN_LIFETIME ? 'over' : ''}
+                style={{ width: `${Math.min(100, (shinLifetimeUsed / SHIN_LIFETIME) * 100)}%` }}
+              />
+            </div>
+            <div className="hint" style={{ marginTop: 4 }}>
+              남은 생애 한도 {fmtMoney(Math.max(0, SHIN_LIFETIME - shinLifetimeUsed), 'JPY')}
+            </div>
+          </div>
+
+          <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
+            취득가 기준, つみたて·성장투자枠 구분 없이 합산한 추정치예요. 매도한 만큼의 생애
+            한도는 다음 해에 부활합니다. 정확한 잔여 한도는 증권사 앱 기준으로 확인하세요.
+          </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {nisaLots.length > 0 && (
+        <div className="card">
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+            onClick={() => setShowOldNisa(!showOldNisa)}
+          >
+            <Icon name="hourglass_bottom" size={19} color="var(--accent)" />
+            <div className="card-title">구NISA 비과세 만료</div>
+            <div style={{ flex: 1 }} />
+            <span className="hint">가장 빠른 만료 {nisaLots[0].expiry}년</span>
+            <Icon name={showOldNisa ? 'expand_less' : 'expand_more'} size={20} color="var(--text-3)" />
+          </div>
+          {showOldNisa && (
+            <>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {nisaLots.map((l, i) => {
+              const status =
+                l.expiry < nowYear
+                  ? { text: '만료됨 · 과세계좌 이관', color: 'var(--up)', bold: true }
+                  : l.expiry === nowYear
+                    ? { text: '올해 말 만료!', color: 'var(--up)', bold: true }
+                    : { text: `${l.expiry - nowYear}년 남음`, color: 'var(--text-3)', bold: false }
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {l.name}
+                    </div>
+                    <div className="hint">
+                      {l.accountName} · {NISA_TYPE_LABEL[l.nisaType]} · {l.buyYear}년 매수
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flex: 'none' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{l.expiry}년 말</div>
+                    <div style={{ fontSize: 12, fontWeight: status.bold ? 800 : 600, color: status.color }}>
+                      {status.text}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
+            만료되면 과세계좌로 자동 이관되고, 이관 시점의 시가가 새 취득가가 됩니다. 만료 전에
+            계속 보유할지 매도할지 정해두는 게 좋아요.
+          </p>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="card" style={{ opacity: 0.75 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

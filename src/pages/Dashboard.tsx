@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { refreshQuotes } from '../lib/quotes'
+import { computeTrendPoints } from '../lib/trend'
 import { usePortfolio } from '../lib/usePortfolio'
 import {
   CURRENCY_LABEL,
@@ -29,7 +30,7 @@ const AUTO_REFRESH_MS = 10 * 60 * 1000
 export default function Dashboard() {
   const p = usePortfolio()
   const accountName = (id: number) => p.accounts.find((a) => a.id === id)?.name ?? ''
-  const snapshots = useLiveQuery(() => db.snapshots.orderBy('date').toArray(), [], [])
+  const [showHoldings, setShowHoldings] = useState(false)
   const refreshedRow = useLiveQuery(() => db.settings.get('quotesRefreshedAt'), [], undefined)
   const refreshedAt = (refreshedRow?.value as number | undefined) ?? 0
   const [refreshing, setRefreshing] = useState(false)
@@ -62,7 +63,8 @@ export default function Dashboard() {
     doRefresh()
   }, [p.holdings.length, refreshedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const trend = snapshots.slice(-30)
+  // 자산 추이 — 거래 이력(첫 매수부터)으로 재구성한 월별 곡선
+  const trend = computeTrendPoints(p.transactions, p.prices, p.fx)
   const maxV = Math.max(...trend.map((s) => s.totalKRW), 1)
   const minV = Math.min(...trend.map((s) => s.totalKRW), maxV)
   const points = trend.map((s, i) => {
@@ -213,33 +215,49 @@ export default function Dashboard() {
           </>
         ) : (
           <p className="hint" style={{ marginTop: 10, lineHeight: 1.5 }}>
-            앱을 열 때마다 그날의 자산이 기록됩니다. 이틀째부터 추이 그래프가 그려져요.
+            매수 기록이 쌓이면 첫 매수일부터의 자산 곡선이 그려집니다.
+          </p>
+        )}
+        {trend.length >= 2 && (
+          <p className="hint" style={{ marginTop: 8, fontSize: 11 }}>
+            거래가 기준 월별 추정 · 마지막 점은 현재 시세
           </p>
         )}
       </div>
 
-      <div className="section-head">
-        <div className="t">보유 종목</div>
-      </div>
-
       {p.holdings.length > 0 ? (
-        <div className="list">
-          {p.holdings.map((h) => (
-            <div className="list-item" key={`${h.accountId}:${h.market}:${h.symbol}`}>
-              <div className="item-icon">{h.market}</div>
-              <div className="item-main">
-                <div className="item-name">{h.name}</div>
-                <div className="item-sub">
-                  <b>{accountName(h.accountId)}</b> · {h.qty.toLocaleString('ko-KR')}주
-                </div>
-              </div>
-              <div className="item-right">
-                <div className="item-value">{fmtMoney(h.value, h.currency)}</div>
-                <div className={`item-ret ${h.gain >= 0 ? 'up' : 'down'}`}>{fmtPct(h.gainPct)}</div>
-              </div>
+        <>
+          <div
+            className="section-head"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setShowHoldings(!showHoldings)}
+          >
+            <div className="t">
+              보유 종목 <span className="hint">{p.holdings.length}종목</span>
             </div>
-          ))}
-        </div>
+            <Icon name={showHoldings ? 'expand_less' : 'expand_more'} size={22} color="var(--text-3)" />
+          </div>
+          {showHoldings && (
+            <div className="list">
+              {p.holdings.map((h) => (
+                <div className="list-item" key={`${h.accountId}:${h.market}:${h.symbol}`}>
+                  <div className="item-icon">{h.market}</div>
+                  <div className="item-main">
+                    <div className="item-name">{h.name}</div>
+                    <div className="item-sub">
+                      <b>{accountName(h.accountId)}</b> · {h.qty.toLocaleString('ko-KR')}
+                      {h.assetClass === 'fund' ? '구' : '주'}
+                    </div>
+                  </div>
+                  <div className="item-right">
+                    <div className="item-value">{fmtMoney(h.value, h.currency)}</div>
+                    <div className={`item-ret ${h.gain >= 0 ? 'up' : 'down'}`}>{fmtPct(h.gainPct)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       ) : (
         <div className="list">
           <div className="empty">
