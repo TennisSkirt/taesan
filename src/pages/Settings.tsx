@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useTheme } from '../theme'
 import { applyImportPlan, buildImportPlan, decodeCsvBuffer, parseCsv, templateCsv } from '../lib/csvImport'
+import { buildEtradePlan, looksLikeEtrade } from '../lib/etradeImport'
 import { buildRakutenPlan, looksLikeRakuten } from '../lib/rakutenImport'
 import {
   bioAvailable,
@@ -171,8 +172,14 @@ export default function Settings() {
   async function importCsv(file: File) {
     try {
       const text = decodeCsvBuffer(await file.arrayBuffer())
-      const isRakuten = looksLikeRakuten(parseCsv(text))
-      const plan = isRakuten ? buildRakutenPlan(text, accounts) : buildImportPlan(text, accounts)
+      const rows = parseCsv(text)
+      const isRakuten = looksLikeRakuten(rows)
+      const isEtrade = !isRakuten && looksLikeEtrade(rows)
+      const plan = isRakuten
+        ? buildRakutenPlan(text, accounts)
+        : isEtrade
+          ? buildEtradePlan(text, accounts)
+          : buildImportPlan(text, accounts)
       const total =
         plan.counts.buy + plan.counts.sell + plan.counts.dividend + plan.counts.cashIn + plan.counts.cashOut
       if (total === 0) {
@@ -180,7 +187,11 @@ export default function Settings() {
         return
       }
       const lines = [
-        isRakuten ? '📄 라쿠텐증권 형식으로 인식했어요' : '📄 태산 템플릿 형식으로 인식했어요',
+        isRakuten
+          ? '📄 라쿠텐증권 형식으로 인식했어요'
+          : isEtrade
+            ? '📄 E*TRADE 형식으로 인식했어요'
+            : '📄 태산 템플릿 형식으로 인식했어요',
         `매수 ${plan.counts.buy} · 매도 ${plan.counts.sell} · 배당 ${plan.counts.dividend} · 입금 ${plan.counts.cashIn} · 출금 ${plan.counts.cashOut}`,
       ]
       if (plan.accountsToCreate.length > 0)
