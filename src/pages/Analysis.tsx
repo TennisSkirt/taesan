@@ -115,13 +115,33 @@ export default function Analysis() {
     if (m >= 0 && m < 12) monthly[m] += toKRW(d.amountNet, d.currency, p.fx)
   }
   const maxDiv = Math.max(...monthly, 1)
+
+  // 월을 탭하면 그 달의 배당 내역 표시 — 기본은 가장 최근 배당이 있는 달
+  const [selMonth, setSelMonth] = useState<number | null>(null)
+  const lastNonZeroMonth = monthly.reduce<number | null>((acc, v, i) => (v > 0 ? i : acc), null)
+  const effMonth = selMonth ?? lastNonZeroMonth
+  const monthDivs =
+    effMonth === null
+      ? []
+      : selectedDivs
+          .filter((d) => Number(d.date.slice(5, 7)) - 1 === effMonth)
+          .sort((a, b) => b.date.localeCompare(a.date))
+  const accountNameOf = (id: number) => p.accounts.find((a) => a.id === id)?.name ?? ''
+
   const bars = monthly.map((v, i) => {
     const h = v === 0 ? 3 : Math.round((v / maxDiv) * 78) + 6
     return {
       x: 4 + i * 24.5,
       y: 92 - h,
       h,
-      fill: v >= maxDiv * 0.5 ? 'var(--up)' : v === 0 ? 'var(--surface-3)' : 'var(--up-weak)',
+      fill:
+        i === effMonth && v > 0
+          ? 'var(--accent)'
+          : v >= maxDiv * 0.5
+            ? 'var(--up)'
+            : v === 0
+              ? 'var(--surface-3)'
+              : 'var(--up-weak)',
     }
   })
 
@@ -185,7 +205,10 @@ export default function Analysis() {
               className="btn-ghost"
               disabled={divYear <= minDivYear}
               style={{ opacity: divYear <= minDivYear ? 0.3 : 1, padding: 4 }}
-              onClick={() => setDivYear(divYear - 1)}
+              onClick={() => {
+                setDivYear(divYear - 1)
+                setSelMonth(null)
+              }}
               aria-label="이전 연도"
             >
               <Icon name="chevron_left" size={20} />
@@ -195,7 +218,10 @@ export default function Analysis() {
               className="btn-ghost"
               disabled={divYear >= year}
               style={{ opacity: divYear >= year ? 0.3 : 1, padding: 4 }}
-              onClick={() => setDivYear(divYear + 1)}
+              onClick={() => {
+                setDivYear(divYear + 1)
+                setSelMonth(null)
+              }}
               aria-label="다음 연도"
             >
               <Icon name="chevron_right" size={20} />
@@ -215,14 +241,70 @@ export default function Analysis() {
               {bars.map((b, i) => (
                 <rect key={i} x={b.x} y={b.y} width="16" height={b.h} rx="4" fill={b.fill} />
               ))}
+              {/* 터치 영역 — 막대보다 넓게 */}
+              {bars.map((_, i) => (
+                <rect
+                  key={`hit-${i}`}
+                  x={i * 24.5}
+                  y={0}
+                  width="24.5"
+                  height="96"
+                  fill="transparent"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setSelMonth(i)}
+                />
+              ))}
             </svg>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, padding: '0 2px' }}>
               {Array.from({ length: 12 }, (_, i) => (
-                <span key={i} className="hint" style={{ fontSize: 9 }}>
+                <span
+                  key={i}
+                  className="hint"
+                  style={{ fontSize: 9, fontWeight: i === effMonth ? 800 : 400, color: i === effMonth ? 'var(--accent)' : undefined, cursor: 'pointer' }}
+                  onClick={() => setSelMonth(i)}
+                >
                   {i + 1}
                 </span>
               ))}
             </div>
+
+            {effMonth !== null && monthDivs.length > 0 && (
+              <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                  <span className="card-title" style={{ fontSize: 13 }}>
+                    {divYear}년 {effMonth + 1}월 내역 · {monthDivs.length}건
+                  </span>
+                  <span className="up" style={{ fontSize: 13, fontWeight: 700 }}>
+                    {fmtMoney(p.toMain(monthly[effMonth]), p.main)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {monthDivs.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {d.name}
+                        </div>
+                        <div className="hint">
+                          {d.date.slice(5).replace('-', '/')} · {accountNameOf(d.accountId)}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flex: 'none' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>+{fmtMoney(d.amountNet, d.currency)}</div>
+                        {d.currency !== p.main && (
+                          <div className="hint">{fmtMoney(p.toMain(toKRW(d.amountNet, d.currency, p.fx)), p.main)}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {effMonth !== null && monthDivs.length === 0 && (
+              <p className="hint" style={{ marginTop: 10 }}>
+                {effMonth + 1}월에는 배당이 없어요
+              </p>
+            )}
           </>
         ) : (
           <p className="hint" style={{ marginTop: 12, lineHeight: 1.5 }}>
